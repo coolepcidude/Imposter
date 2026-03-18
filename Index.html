@@ -188,7 +188,7 @@ function App(){
   const [qError,setQError]=useState(false);
 
   useEffect(()=>{
-    fetch("questions.json")
+    fetch("question.JSON")
       .then(r=>{if(!r.ok)throw 0;return r.json();})
       .then(d=>{setQs(d);setQLoading(false);})
       .catch(()=>{setQError(true);setQLoading(false);});
@@ -413,7 +413,7 @@ function App(){
             <div style={{fontSize:48,marginBottom:12}}>📂</div>
             <h2 style={{fontSize:22,fontWeight:900,color:"#FF2D55",marginBottom:10}}>questions.json not found</h2>
             <p style={{color:"#ffffffaa",fontSize:14,lineHeight:1.7,marginBottom:18}}>
-              Place a <code style={{background:"#ffffff18",padding:"2px 8px",borderRadius:6,color:"#FFD60A"}}>questions.json</code> file
+              Place a <code style={{background:"#ffffff18",padding:"2px 8px",borderRadius:6,color:"#FFD60A"}}>question.JSON</code> file
               in the same folder, then open this HTML via a local server
               (e.g. <code style={{background:"#ffffff18",padding:"2px 8px",borderRadius:6,color:"#FFD60A"}}>npx serve .</code>).
             </p>
