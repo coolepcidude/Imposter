@@ -50,5 +50,26 @@
   { "a": "What weather do you feel most productive in?",                     "b": "What weather puts you in the best mood?" },
   { "a": "What fictional character do you relate to most?",                  "b": "What fictional character do you think is most like you?" },
   { "a": "What fictional character would you want as your best friend?",     "b": "What fictional character would you want in your corner during a crisis?" },
-  { "a": "What brand do you always go back to even if there are cheaper options?","b": "What brand do you feel weirdly loyal to?" }
+  { "a": "What brand do you always go back to even if there are cheaper options?","b": "What brand do you feel weirdly loyal to?" },
+
+  { "a": "What's your default fast food order?",                             "b": "What meal do you get when you're in a rush and hungry?" },
+  { "a": "What dessert do you never get tired of?",                          "b": "What sweet treat do you always make room for?" },
+  { "a": "What drink do you always have in your fridge?",                    "b": "What beverage do you restock without thinking?" },
+  { "a": "What place feels like your second home?",                          "b": "Where do you spend time when you don't want to be at home?" },
+  { "a": "What place would you show someone visiting your area?",            "b": "Where do you take people when you want to impress them locally?" },
+  { "a": "Who do you text the most?",                                        "b": "Who do you talk to almost every day?" },
+  { "a": "Who knows you better than anyone?",                                "b": "Who would describe you most accurately?" },
+  { "a": "What game have you played the most hours of?",                     "b": "What game do you always come back to over time?" },
+  { "a": "What app do you waste the most time on?",                          "b": "What app do you open without thinking?" },
+  { "a": "What habit are you trying to break?",                              "b": "What habit do you wish you didn't have?" },
+  { "a": "What habit are you trying to build?",                              "b": "What routine do you wish you stuck to more?" },
+  { "a": "What time of day are you most productive?",                        "b": "When do you feel like you get the most done?" },
+  { "a": "What kind of music do you listen to when you're alone?",           "b": "What music do you put on when nobody else is around?" },
+  { "a": "What kind of music do you play around other people?",              "b": "What music do you feel safe putting on with friends?" },
+  { "a": "What skill would you flex if you had to impress people?",          "b": "What talent would you show off if you had one chance?" },
+  { "a": "What would you do with a completely free day?",                    "b": "How would you spend a day with zero responsibilities?" },
+  { "a": "What purchase have you never regretted?",                          "b": "What is the best thing you've ever spent money on?" },
+  { "a": "What purchase do you regret the most?",                            "b": "What is something you wish you never bought?" },
+  { "a": "What kind of videos do you fall into watching for hours?",         "b": "What content do you lose track of time watching?" },
+  { "a": "What’s something you're surprisingly competitive about?",          "b": "What do you hate losing at more than you should?" }
 ]
