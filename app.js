@@ -1,35 +1,57 @@
 /* ════════════════════════════════════════════════════
-   app.js
-   React UI for Outlier Party Game.
-   Depends on globals: React, ReactDOM, Babel,
-                       gameEngine.js, sounds.js
+   app.js  —  Outlier Party Game
+   React UI. Depends on: gameEngine.js, sounds.js
 ════════════════════════════════════════════════════ */
-
 const { useState, useReducer, useEffect, useRef, useCallback, memo } = React;
 
 /* ──────────────────────────────────────
-   UI CONSTANTS
+   CONSTANTS
 ────────────────────────────────────── */
 const COLORS = [
-  '#FF2D55', '#FF9F0A', '#30D158', '#0A84FF',
-  '#BF5AF2', '#FF6B35', '#FFD60A', '#00C7BE',
-  '#FF375F', '#5E5CE6',
+  '#FF6B6B', '#FF9F45', '#FFCB47', '#56CFB2',
+  '#4DA6FF', '#C084FC', '#F472B6', '#34D399',
+  '#FB923C', '#818CF8',
 ];
 
 const MODES = [
-  { id: 'clueless',    emoji: '🤷', name: 'Clueless',     color: '#0A84FF',
-    tagline: 'Nobody knows — not even the imposter' },
-  { id: 'undercover',  emoji: '🕵️', name: 'Undercover',  color: '#FF9F0A',
-    tagline: 'The imposter knows — can they fool everyone?' },
-  { id: 'doublecross', emoji: '🎭', name: 'Double Cross', color: '#FF2D55',
-    tagline: 'Two imposters, neither knows the other · 3+ players', min: 3 },
+  {
+    id: 'clueless',    emoji: '🤷', name: 'Clueless',     color: '#4DA6FF',
+    tagline: 'Nobody knows — not even the outlier',
+  },
+  {
+    id: 'undercover',  emoji: '🕵️', name: 'Undercover',  color: '#FF9F45',
+    tagline: 'The outlier knows — can they fool everyone?',
+  },
+  {
+    id: 'doublecross', emoji: '🎭', name: 'Double Cross', color: '#FF6B6B',
+    tagline: 'Two outliers, neither knows the other · 3+ players', min: 3,
+  },
+  {
+    id: 'reverse',     emoji: '🔄', name: 'Reverse',      color: '#56CFB2',
+    tagline: 'Find the matching pair — two players share a question',
+  },
+];
+
+const MODIFIERS = [
+  { id: 'numbers',  emoji: '🔢', label: 'Numbers Only',   rule: 'Your answer must only contain numbers.' },
+  { id: 'emojis',   emoji: '😏', label: 'Emojis Only',    rule: 'Your answer must only use emojis.' },
+  { id: 'specific', emoji: '🔬', label: 'Oddly Specific', rule: 'Be as specific as humanly possible.' },
+  { id: 'vague',    emoji: '🌫️', label: 'Stay Vague',     rule: 'Be as vague as possible — no names, no details.' },
+];
+
+const QUESTION_PACKS = [
+  { id: 'main',         label: 'Classic',       emoji: '🎲', file: 'questions/main.json',          desc: 'Everyday questions about you' },
+  { id: 'players',      label: 'About Us',      emoji: '👥', file: 'questions/players.json',        desc: 'Questions featuring a player in the room', hasPlayer: true },
+  { id: 'hypothetical', label: 'Hypothetical',  emoji: '🤔', file: 'questions/hypothetical.json',   desc: 'What would you do if…' },
+  { id: 'deep',         label: 'Deep Cuts',     emoji: '💭', file: 'questions/deep.json',            desc: 'Meaningful & introspective' },
+  { id: 'spicy',        label: 'Spicy',         emoji: '🌶️', file: 'questions/spicy.json',          desc: 'Controversial opinions & hot takes' },
+  { id: 'nostalgia',    label: 'Nostalgia',     emoji: '📼', file: 'questions/nostalgia.json',       desc: 'Childhood memories & throwbacks' },
 ];
 
 /* ──────────────────────────────────────
    INITIAL STATE
 ────────────────────────────────────── */
 const INITIAL_STATE = {
-  /* Setup */
   phase:        'setup',
   mode:         'clueless',
   totalRounds:  3,
@@ -41,83 +63,61 @@ const INITIAL_STATE = {
   ],
   nameError: '',
 
-  /* Per-game */
   round:          1,
   scores:         {},
   usedIdx:        [],
   questionsCycled: false,
 
-  /* Per-round: answering */
-  qOrder:  [],
-  curAns:  0,
-  qPair:   null,
-  impIdxs: [],
-  answers: {},
-  writing: '',
+  qOrder:         [],
+  curAns:         0,
+  qPair:          null,
+  impIdxs:        [],
+  answers:        {},
+  writing:        '',
+  playerVariants: null,
+  playerSubject:  null,
 
-  /* Per-round: voting */
-  voteOrder: [],
-  curVoter:  0,
-  votes:     {},
+  voteOrder:  [],
+  curVoter:   0,
+  votes:      {},
 
-  /* Reveal */
   roundPts:    {},
   confetti:    false,
-  revealStage: 0,   // 0=suspense | 1=name | 2=breakdown | 3=leaderboard+button
+  revealStage: 0,
   groupWon:    false,
 };
 
 /* ──────────────────────────────────────
    REDUCER
-   Single source of truth for all game
-   state. Pure — no side effects.
 ────────────────────────────────────── */
 function reducer(state, action) {
   switch (action.type) {
 
-    /* ── Setup mutations ── */
-    case 'SET_MODE':
-      return { ...state, mode: action.mode };
-
-    case 'SET_ROUNDS':
-      return { ...state, totalRounds: action.rounds };
-
-    case 'TOGGLE_TIMER':
-      return { ...state, timerEnabled: !state.timerEnabled };
-
-    case 'SET_TIMER_SECONDS':
-      return { ...state, timerSeconds: action.seconds };
+    case 'SET_MODE':         return { ...state, mode: action.mode };
+    case 'SET_ROUNDS':       return { ...state, totalRounds: action.rounds };
+    case 'TOGGLE_TIMER':     return { ...state, timerEnabled: !state.timerEnabled };
+    case 'SET_TIMER_SECONDS':return { ...state, timerSeconds: action.seconds };
 
     case 'ADD_PLAYER': {
       if (state.players.length >= 10) return state;
       const idx = state.players.length;
-      return {
-        ...state,
-        players: [...state.players, { id: generateId(), name: '', colorIdx: idx % COLORS.length }],
-      };
+      return { ...state, players: [...state.players, { id: generateId(), name: '', colorIdx: idx % COLORS.length }] };
     }
 
     case 'REMOVE_PLAYER': {
       if (state.players.length <= 2) return state;
       const remaining = state.players
         .filter(p => p.id !== action.id)
-        .map((p, i) => ({ ...p, colorIdx: i % COLORS.length })); /* re-index colours */
+        .map((p, i) => ({ ...p, colorIdx: i % COLORS.length }));
       return { ...state, players: remaining, nameError: '' };
     }
 
     case 'UPDATE_PLAYER_NAME':
-      return {
-        ...state,
-        nameError: '',
-        players: state.players.map(p =>
-          p.id === action.id ? { ...p, name: action.name } : p
-        ),
-      };
+      return { ...state, nameError: '', players: state.players.map(p => p.id === action.id ? { ...p, name: action.name } : p) };
 
     case 'SET_NAME_ERROR':
       return { ...state, nameError: action.error };
 
-    /* ── Game start ── */
     case 'BEGIN_GAME': {
       const { validPlayers, roundData } = action;
       const scores = {};
@@ -132,26 +132,19 @@ function reducer(state, action) {
         qPair:           roundData.qPair,
         qOrder:          roundData.qOrder,
         impIdxs:         roundData.impIdxs,
+        playerVariants:  roundData.playerVariants,
+        playerSubject:   roundData.playerSubject,
         voteOrder:       roundData.voteOrder,
-        curAns:   0,
-        answers:  {},
-        writing:  '',
-        curVoter: 0,
-        votes:    {},
-        roundPts: {},
-        confetti: false,
-        groupWon: false,
-        revealStage: 0,
-        nameError:   '',
-        phase:       'q_handoff',
+        curAns:   0, answers:  {}, writing:  '',
+        curVoter: 0, votes:    {}, roundPts: {},
+        confetti: false, groupWon: false, revealStage: 0, nameError: '',
+        phase: 'q_handoff',
       };
     }
 
-    /* ── Phase navigation ── */
     case 'SET_PHASE':
       return { ...state, phase: action.phase };
 
-    /* ── Answering ── */
     case 'SET_WRITING':
       return { ...state, writing: action.value };
 
@@ -161,23 +154,21 @@ function reducer(state, action) {
       const answer     = state.writing.trim() || '…';
       const newAnswers = { ...state.answers, [playerName]: answer };
       const nextAns    = state.curAns + 1;
-
       if (nextAns >= state.players.length) {
         return { ...state, answers: newAnswers, writing: '', phase: 'vote_handoff' };
       }
       return { ...state, answers: newAnswers, writing: '', curAns: nextAns, phase: 'q_handoff' };
     }
 
-    /* ── Voting ── */
     case 'CAST_VOTE': {
       const voterName = state.voteOrder[state.curVoter];
       let newVotes;
       if (state.mode === 'doublecross') {
-        const cur = state.votes[voterName] || [];
-        let next;
+        const cur  = state.votes[voterName] || [];
+        let   next;
         if (cur.includes(action.suspect))  next = cur.filter(x => x !== action.suspect);
         else if (cur.length < 2)           next = [...cur, action.suspect];
-        else                               next = [cur[1], action.suspect]; /* replace oldest */
+        else                               next = [cur[1], action.suspect];
         newVotes = { ...state.votes, [voterName]: next };
       } else {
         newVotes = { ...state.votes, [voterName]: action.suspect };
@@ -187,39 +178,24 @@ function reducer(state, action) {
 
     case 'CONFIRM_VOTE': {
       const nextVoter = state.curVoter + 1;
-
-      /* More voters remain */
       if (nextVoter < state.players.length) {
         return { ...state, curVoter: nextVoter, phase: 'vote_handoff' };
       }
-
-      /* All voted — compute scores using the centralised engine function */
       const playerNames = state.players.map(p => p.name);
       const impNames    = state.impIdxs.map(i => state.players[i]?.name).filter(Boolean);
       const earned      = computeRoundScores(state.votes, impNames, state.mode, playerNames);
       const newScores   = {};
       playerNames.forEach(n => { newScores[n] = (state.scores[n] || 0) + (earned[n] || 0); });
-      /* Compute once here so reveal effect can read from state — no stale closures */
       const won = checkGroupWon(state.votes, impNames, state.mode);
-
-      return {
-        ...state,
-        roundPts:    earned,
-        scores:      newScores,
-        groupWon:    won,
-        phase:       'reveal',
-        revealStage: 0,
-      };
+      return { ...state, roundPts: earned, scores: newScores, groupWon: won, phase: 'reveal', revealStage: 0 };
     }
 
-    /* ── Reveal drama ── */
     case 'SET_REVEAL_STAGE':
       return { ...state, revealStage: action.stage };
 
     case 'SET_CONFETTI':
       return { ...state, confetti: action.value };
 
-    /* ── Next round ── */
     case 'NEXT_ROUND': {
       const { roundData, newRound } = action;
       return {
@@ -230,24 +206,19 @@ function reducer(state, action) {
         qPair:           roundData.qPair,
         qOrder:          roundData.qOrder,
         impIdxs:         roundData.impIdxs,
+        playerVariants:  roundData.playerVariants,
+        playerSubject:   roundData.playerSubject,
         voteOrder:       roundData.voteOrder,
-        curAns:   0,
-        answers:  {},
-        writing:  '',
-        curVoter: 0,
-        votes:    {},
-        roundPts: {},
-        confetti: false,
-        groupWon: false,
-        revealStage: 0,
-        phase:       'q_handoff',
+        curAns:   0, answers:  {}, writing:  '',
+        curVoter: 0, votes:    {}, roundPts: {},
+        confetti: false, groupWon: false, revealStage: 0,
+        phase: 'q_handoff',
       };
     }
 
     case 'GO_FINAL':
       return { ...state, phase: 'final' };
 
-    /* Preserve player names / settings when going back to setup */
     case 'RESET_TO_SETUP':
       return {
         ...INITIAL_STATE,
@@ -264,99 +235,105 @@ function reducer(state, action) {
 }
 
 /* ──────────────────────────────────────
-   STATIC STYLE OBJECTS
-   Defined outside components so they
-   are never re-created on render.
+   STYLE TOKENS
 ────────────────────────────────────── */
+const T = {
+  /* Colours */
+  bg:        '#070810',
+  surface:   'rgba(255,255,255,0.03)',
+  border:    'rgba(255,255,255,0.07)',
+  borderHi:  'rgba(255,255,255,0.14)',
+  text:      '#F0F4FF',
+  textMid:   'rgba(240,244,255,0.55)',
+  textDim:   'rgba(240,244,255,0.28)',
+  /* Radii */
+  r:  16,
+  rl: 22,
+  rx: 28,
+};
+
 const S = {
   page: {
     minHeight:      '100vh',
-    background:     '#0c0c1b',
+    background:     T.bg,
     display:        'flex',
     flexDirection:  'column',
     alignItems:     'center',
     justifyContent: 'center',
-    padding:        '24px 18px',
+    padding:        '28px 18px 40px',
     position:       'relative',
     overflow:       'hidden',
   },
-  card:  { width: '100%', maxWidth: 460 },
+  card:  { width: '100%', maxWidth: 468 },
   lbl: {
-    color:          '#ffffff75',
-    fontSize:       10,
-    letterSpacing:  3,
-    textTransform:  'uppercase',
-    display:        'block',
-    marginBottom:   8,
-    fontWeight:     800,
+    color:         T.textDim,
+    fontSize:      10,
+    letterSpacing: 2.5,
+    textTransform: 'uppercase',
+    display:       'block',
+    marginBottom:  10,
+    fontWeight:    700,
   },
   inp: {
-    width:       '100%',
-    background:  '#ffffff0e',
-    border:      '1.5px solid #ffffff22',
-    borderRadius: 12,
-    padding:     '13px 15px',
-    color:       '#fff',
-    fontSize:    15,
-    outline:     'none',
-    fontFamily:  'inherit',
-  },
-  hr: {
-    height:     1,
-    background: 'linear-gradient(90deg, transparent, #ffffff28, transparent)',
-    margin:     '18px 0',
-  },
-  ghostBtn: {
-    display:      'block',
     width:        '100%',
-    padding:      '12px',
-    borderRadius: 14,
-    border:       '2px solid #ffffff22',
-    background:   'transparent',
-    color:        '#ffffff60',
-    fontSize:     13,
-    fontWeight:   700,
+    background:   T.surface,
+    border:       `1px solid ${T.border}`,
+    borderRadius: T.r,
+    padding:      '13px 16px',
+    color:        T.text,
+    fontSize:     15,
+    outline:      'none',
     fontFamily:   'inherit',
-    cursor:       'pointer',
+    transition:   'border-color .18s, box-shadow .18s',
   },
+  glass: (accent) => ({
+    background:          accent ? `${accent}08` : T.surface,
+    border:              `1px solid ${accent ? accent + '25' : T.border}`,
+    borderRadius:        T.rl,
+    padding:             '18px',
+    backdropFilter:      'blur(16px)',
+    WebkitBackdropFilter:'blur(16px)',
+  }),
 };
 
-/* Dynamic style helpers (depend on runtime colour values) */
 const D = {
   btn: (col, ghost = false, sm = false, dis = false) => ({
     display:      'block',
     width:        '100%',
-    padding:      sm ? '12px 16px' : '15px 20px',
-    borderRadius: 15,
-    border:       ghost ? `2px solid ${col}40` : 'none',
+    padding:      sm ? '11px 16px' : '15px 20px',
+    borderRadius: sm ? 13 : 16,
+    border:       ghost ? `1.5px solid ${col}50` : 'none',
     background:   ghost      ? 'transparent'
                 : col === 'grad'
-                    ? 'linear-gradient(135deg, #FF2D55, #FF9F0A, #FFD60A)'
-                    : `linear-gradient(135deg, ${col}, ${col}cc)`,
-    color:        '#fff',
+                    ? 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)'
+                    : `linear-gradient(135deg, ${col} 0%, ${col}cc 100%)`,
+    color:        ghost ? col : '#fff',
     fontSize:     sm ? 13 : 15,
-    fontWeight:   900,
-    letterSpacing: 0.4,
-    textShadow:   ghost ? 'none' : '0 1px 5px rgba(0,0,0,.5)',
-    boxShadow:    dis || ghost ? 'none' : `0 4px 26px ${col === 'grad' ? '#FF2D5560' : col + '55'}`,
-    opacity:      dis ? 0.24 : 1,
+    fontWeight:   800,
+    letterSpacing: 0.3,
+    textShadow:   ghost ? 'none' : '0 1px 6px rgba(0,0,0,.4)',
+    boxShadow:    dis || ghost ? 'none'
+                : col === 'grad' ? '0 4px 22px rgba(99,102,241,.45)'
+                : `0 4px 22px ${col}44`,
+    opacity:      dis ? 0.28 : 1,
     cursor:       dis ? 'not-allowed' : 'pointer',
+    transition:   'opacity .15s, transform .12s, box-shadow .2s',
+    fontFamily:   'inherit',
   }),
 
   avatar: (color, size = 36) => ({
-    width:        size,
-    height:       size,
-    borderRadius: '50%',
-    flexShrink:   0,
-    background:   color + '28',
-    border:       `2px solid ${color}`,
-    display:      'flex',
-    alignItems:   'center',
-    justifyContent: 'center',
-    fontSize:     Math.floor(size * 0.38),
-    fontWeight:   900,
+    width:           size,
+    height:          size,
+    borderRadius:    '50%',
+    flexShrink:      0,
+    background:      color + '18',
+    border:          `1.5px solid ${color}55`,
+    display:         'flex',
+    alignItems:      'center',
+    justifyContent:  'center',
+    fontSize:        Math.floor(size * 0.38),
+    fontWeight:      800,
     color,
-    boxShadow:    `0 0 12px ${color}55`,
   }),
 
   modePill: (color, selected) => ({
@@ -364,11 +341,11 @@ const D = {
     alignItems: 'center',
     gap:        14,
     padding:    '14px 16px',
-    borderRadius: 16,
-    border:     `2px solid ${selected ? color : color + '22'}`,
-    background: selected ? `linear-gradient(135deg, ${color}22, ${color}08)` : '#ffffff07',
-    boxShadow:  selected ? `0 0 28px ${color}38, inset 0 0 20px ${color}08` : 'none',
-    transition: 'all .22s',
+    borderRadius: T.rl,
+    border:     `1px solid ${selected ? color + '55' : T.border}`,
+    background: selected ? color + '12' : T.surface,
+    boxShadow:  selected ? `0 0 0 1px ${color}28, 0 6px 24px ${color}18` : 'none',
+    transition: 'all .2s',
     textAlign:  'left',
     width:      '100%',
     fontFamily: 'inherit',
@@ -377,44 +354,31 @@ const D = {
 };
 
 /* ──────────────────────────────────────
-   MEMOIZED COMPONENTS
-   React.memo prevents re-renders when
-   props have not changed. Critical for
-   keeping animations smooth during the
-   1-second timer ticks.
+   MEMOISED COMPONENTS
 ────────────────────────────────────── */
 
-/* Particle confetti canvas */
+/* Confetti canvas */
 const Confetti = memo(function Confetti({ active }) {
   const ref = useRef();
   const raf = useRef();
-
   useEffect(() => {
     if (!active) return;
     const c   = ref.current;
     const ctx = c.getContext('2d');
     c.width   = window.innerWidth;
     c.height  = window.innerHeight;
-
     let ps = Array.from({ length: 220 }, () => ({
-      x:   Math.random() * c.width,
-      y:   -14,
-      r:   Math.random() * 9 + 3,
+      x: Math.random() * c.width, y: -14,
+      r: Math.random() * 9 + 3,
       col: COLORS[Math.floor(Math.random() * COLORS.length)],
-      sp:  Math.random() * 5 + 2,
-      spin: Math.random() * 0.18 - 0.09,
-      ang: Math.random() * Math.PI * 2,
-      wb:  Math.random() * 14,
-      wa:  Math.random() * Math.PI * 2,
-      ws:  Math.random() * 0.07 + 0.02,
+      sp: Math.random() * 5 + 2, spin: Math.random() * 0.18 - 0.09,
+      ang: Math.random() * Math.PI * 2, wb: Math.random() * 14,
+      wa: Math.random() * Math.PI * 2, ws: Math.random() * 0.07 + 0.02,
     }));
-
     function draw() {
       ctx.clearRect(0, 0, c.width, c.height);
       ps.forEach(p => {
-        p.y   += p.sp;
-        p.ang += p.spin;
-        p.wa  += p.ws;
+        p.y += p.sp; p.ang += p.spin; p.wa += p.ws;
         ctx.save();
         ctx.translate(p.x + Math.sin(p.wa) * p.wb, p.y);
         ctx.rotate(p.ang);
@@ -425,43 +389,22 @@ const Confetti = memo(function Confetti({ active }) {
       ps = ps.filter(p => p.y < c.height + 20);
       if (ps.length > 0) raf.current = requestAnimationFrame(draw);
     }
-
     raf.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf.current);
   }, [active]);
-
   if (!active) return null;
   return <canvas ref={ref} style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 9999 }} />;
 });
 
-/* Animated gradient background blobs */
-const BlobBG = memo(function BlobBG({ accent = '#FF2D55' }) {
+/* Animated gradient blobs */
+const BlobBG = memo(function BlobBG({ accent = '#6366F1' }) {
   return (
     <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
-      <div style={{
-        position: 'absolute', top: '-20%', left: '-10%',
-        width: '70vw', height: '70vw', borderRadius: '50%',
-        background: `radial-gradient(circle, ${accent}20 0%, transparent 70%)`,
-        animation: 'drift1 13s ease-in-out infinite',
-        transition: 'background 1.2s',
-      }} />
-      <div style={{
-        position: 'absolute', bottom: '-15%', right: '-10%',
-        width: '65vw', height: '65vw', borderRadius: '50%',
-        background: 'radial-gradient(circle, #0A84FF1e 0%, transparent 70%)',
-        animation: 'drift2 16s ease-in-out infinite',
-      }} />
-      <div style={{
-        position: 'absolute', top: '40%', right: '5%',
-        width: '40vw', height: '40vw', borderRadius: '50%',
-        background: 'radial-gradient(circle, #BF5AF218 0%, transparent 70%)',
-        animation: 'drift3 11s ease-in-out infinite',
-      }} />
-      <div style={{
-        position: 'absolute', inset: 0, opacity: 0.022,
-        backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)',
-        backgroundSize: '38px 38px',
-      }} />
+      <div style={{ position: 'absolute', top: '-25%', left: '-10%', width: '65vw', height: '65vw', borderRadius: '50%', background: `radial-gradient(circle, ${accent}18 0%, transparent 68%)`, animation: 'drift1 14s ease-in-out infinite', transition: 'background 1.4s' }} />
+      <div style={{ position: 'absolute', bottom: '-20%', right: '-8%',  width: '55vw', height: '55vw', borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 68%)',  animation: 'drift2 18s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', top: '45%',   right: '5%',     width: '40vw', height: '40vw', borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 68%)',   animation: 'drift3 12s ease-in-out infinite' }} />
+      {/* Fine grid overlay */}
+      <div style={{ position: 'absolute', inset: 0, opacity: 0.018, backgroundImage: 'linear-gradient(rgba(255,255,255,.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.6) 1px, transparent 1px)', backgroundSize: '44px 44px' }} />
     </div>
   );
 });
@@ -472,10 +415,10 @@ const PBar = memo(function PBar({ total, current, accent }) {
     <div style={{ display: 'flex', gap: 5, justifyContent: 'center', marginBottom: 20 }}>
       {Array.from({ length: total }).map((_, i) => (
         <div key={i} style={{
-          height: 5, flex: 1, maxWidth: 30, borderRadius: 99,
-          background: i < current ? '#ffffff65' : i === current ? accent : '#ffffff18',
-          boxShadow:  i === current ? `0 0 10px ${accent}, 0 0 20px ${accent}55` : 'none',
-          transition: 'all .4s',
+          height: 4, flex: 1, maxWidth: 28, borderRadius: 99,
+          background:  i < current ? 'rgba(255,255,255,0.55)' : i === current ? accent : 'rgba(255,255,255,0.1)',
+          boxShadow:   i === current ? `0 0 8px ${accent}` : 'none',
+          transition: 'all .35s',
         }} />
       ))}
     </div>
@@ -488,134 +431,142 @@ const ScoreRow = memo(function ScoreRow({ name, score, roundPts, rank, color, de
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px',
-      background:   rank === 1 ? `linear-gradient(135deg, ${color}28, ${color}10)` : '#ffffff0a',
-      border:       `1.5px solid ${rank === 1 ? color + '70' : '#ffffff18'}`,
-      borderRadius: 15,
-      boxShadow:    rank === 1 ? `0 0 26px ${color}35` : 'none',
+      background:   rank === 1 ? `${color}14` : 'rgba(255,255,255,0.04)',
+      border:       `1px solid ${rank === 1 ? color + '55' : T.border}`,
+      borderRadius: T.r,
+      boxShadow:    rank === 1 ? `0 0 0 1px ${color}22, 0 6px 24px ${color}28` : 'none',
       animation:    'stagger .4s ease both',
       animationDelay: `${delay}ms`,
     }}>
-      <span style={{ fontSize: 22, width: 30, textAlign: 'center', flexShrink: 0 }}>
+      <span style={{ fontSize: 20, width: 28, textAlign: 'center', flexShrink: 0 }}>
         {rank <= 3 ? medals[rank - 1] : rank}
       </span>
       <div style={D.avatar(color)}>{name[0]?.toUpperCase()}</div>
-      <span style={{ flex: 1, fontWeight: 700, fontSize: 15, color: rank === 1 ? '#fff' : '#ffffffcc' }}>
-        {name}
-      </span>
+      <span style={{ flex: 1, fontWeight: 700, fontSize: 15, color: rank === 1 ? T.text : T.textMid }}>{name}</span>
       {roundPts > 0 && (
-        <span style={{
-          fontSize: 11, fontWeight: 900, color: '#30D158',
-          background: '#30D15820', border: '1px solid #30D15850',
-          borderRadius: 8, padding: '3px 9px',
-          animation: 'popIn .3s ease both', animationDelay: `${delay + 180}ms`,
-        }}>
+        <span style={{ fontSize: 11, fontWeight: 800, color: '#34D399', background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.28)', borderRadius: 8, padding: '3px 9px', animation: 'popIn .3s ease both', animationDelay: `${delay + 180}ms` }}>
           +{roundPts}
         </span>
       )}
-      <span style={{ fontSize: 24, fontWeight: 900, color: rank === 1 ? color : '#ffffffaa' }}>{score}</span>
-      <span style={{ fontSize: 10, color: '#ffffff40', marginLeft: 2 }}>pts</span>
+      <span style={{ fontSize: 22, fontWeight: 900, color: rank === 1 ? color : T.textMid }}>{score}</span>
+      <span style={{ fontSize: 10, color: T.textDim, marginLeft: 2 }}>pts</span>
     </div>
   );
 });
 
-/* Handoff / lock screen shown between players */
+/* Lock / handoff screen */
 const LockScreen = memo(function LockScreen({ name, color, sub, btnLabel, onReady }) {
   return (
     <div style={{ maxWidth: 440, width: '100%', textAlign: 'center', animation: 'fadeUp .32s ease both' }}>
-      <div style={{
-        width: 88, height: 88, borderRadius: '50%', margin: '0 auto 18px',
-        background: `linear-gradient(135deg, ${color}40, ${color}15)`,
-        border:     `3px solid ${color}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 42,
-        boxShadow:  `0 0 50px ${color}65, 0 0 90px ${color}22`,
-        animation:  'lockBounce 1.6s ease-in-out infinite',
-      }}>🔒</div>
-      <p style={{ color: '#ffffff50', fontSize: 10, letterSpacing: 4, textTransform: 'uppercase', fontWeight: 800, marginBottom: 8 }}>
-        {sub || 'Pass the phone to'}
-      </p>
-      <h2 style={{
-        fontSize: 48, fontWeight: 900, letterSpacing: '-2px', marginBottom: 5,
-        color, textShadow: `0 0 40px ${color}, 0 0 80px ${color}55`,
-      }}>{name}</h2>
-      <p style={{ color: '#ffffff35', fontSize: 13, marginBottom: 30 }}>
-        Make sure nobody else is looking 👀
-      </p>
+      <div style={{ width: 88, height: 88, borderRadius: '50%', margin: '0 auto 20px', background: `${color}20`, border: `2px solid ${color}60`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 42, boxShadow: `0 0 40px ${color}50, 0 0 80px ${color}18`, animation: 'lockBounce 1.8s ease-in-out infinite' }}>🔒</div>
+      <p style={{ color: T.textDim, fontSize: 10, letterSpacing: 3, textTransform: 'uppercase', fontWeight: 700, marginBottom: 8 }}>{sub || 'Pass the phone to'}</p>
+      <h2 style={{ fontSize: 46, fontWeight: 900, letterSpacing: '-1.5px', marginBottom: 6, color, textShadow: `0 0 40px ${color}80` }}>{name}</h2>
+      <p style={{ color: T.textDim, fontSize: 13, marginBottom: 30 }}>Make sure nobody else is looking 👀</p>
       <button onClick={onReady} style={D.btn(color)}>{btnLabel}</button>
     </div>
   );
 });
 
-/* Countdown timer bar */
+/* Timer bar */
 const TimerBar = memo(function TimerBar({ timeLeft, total, accent }) {
   const pct       = (timeLeft / total) * 100;
   const isWarning = timeLeft <= 5;
   const isDanger  = timeLeft <= 3;
-  const barColor  = isDanger ? '#FF2D55' : isWarning ? '#FF9F0A' : accent;
-
+  const barColor  = isDanger ? '#FF6B6B' : isWarning ? '#FF9F45' : accent;
   return (
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, alignItems: 'center' }}>
-        <span style={{ fontSize: 10, color: '#ffffff50', letterSpacing: 2, textTransform: 'uppercase', fontWeight: 800 }}>Time</span>
-        <span style={{
-          fontSize: 20, fontWeight: 900, color: barColor,
-          animation: isWarning ? 'timerPulse .8s ease-in-out infinite' : 'none',
-        }}>{timeLeft}s</span>
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, alignItems: 'center' }}>
+        <span style={{ fontSize: 10, color: T.textDim, letterSpacing: 2, textTransform: 'uppercase', fontWeight: 700 }}>Time</span>
+        <span style={{ fontSize: 20, fontWeight: 900, color: barColor, animation: isWarning ? 'timerPulse .8s ease-in-out infinite' : 'none' }}>{timeLeft}s</span>
       </div>
-      <div style={{ height: 6, background: '#ffffff15', borderRadius: 99, overflow: 'hidden' }}>
-        <div className="timer-bar-fill" style={{
-          width: `${pct}%`,
-          background: `linear-gradient(90deg, ${barColor}aa, ${barColor})`,
-          boxShadow:  `0 0 8px ${barColor}`,
-        }} />
+      <div style={{ height: 5, background: 'rgba(255,255,255,0.08)', borderRadius: 99, overflow: 'hidden' }}>
+        <div className="timer-bar-fill" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${barColor}99, ${barColor})`, boxShadow: `0 0 8px ${barColor}` }} />
       </div>
     </div>
   );
 });
 
-/* Generic styled button — outside App so React never re-creates the component class */
+/* Generic full-width button */
 const PBtn = memo(function PBtn({ col, ghost, sm, dis, onClick, children }) {
+  return <button onClick={onClick} disabled={dis} style={D.btn(col, ghost, sm, dis)}>{children}</button>;
+});
+
+/* Modifier pill banner shown during question phase */
+const ModifierBanner = memo(function ModifierBanner({ modifiers }) {
+  if (!modifiers || modifiers.length === 0) return null;
   return (
-    <button onClick={onClick} disabled={dis} style={D.btn(col, ghost, sm, dis)}>
-      {children}
-    </button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+      {modifiers.map(mod => (
+        <div key={mod.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderRadius: 12, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.28)' }}>
+          <span style={{ fontSize: 15 }}>{mod.emoji}</span>
+          <div>
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#FBBF24', letterSpacing: 1.5, textTransform: 'uppercase' }}>{mod.label}</span>
+            <span style={{ display: 'block', fontSize: 12, color: 'rgba(251,191,36,0.75)', marginTop: 1 }}>{mod.rule}</span>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 });
 
 /* ──────────────────────────────────────
-   MAIN APP COMPONENT
+   MAIN APP
 ────────────────────────────────────── */
 function App() {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
 
-  /* Questions loaded from question.JSON */
-  const [qs,       setQs]       = useState([]);
-  const [qLoading, setQLoading] = useState(true);
-  const [qError,   setQError]   = useState(false);
+  /* Question packs */
+  const [activePacks,   setActivePacks]   = useState(['main']);
+  const [qs,            setQs]            = useState([]);
+  const [reverseQs,     setReverseQs]     = useState([]);
+  const [qLoading,      setQLoading]      = useState(true);
+  const [qError,        setQError]        = useState(false);
 
-  /* Timer lives outside the reducer to avoid hammering it every second */
-  const [timeLeft, setTimeLeft] = useState(30);
-  const timerRef    = useRef(null);
-  const submittedRef = useRef(false); /* prevents double-submit when timer fires */
+  /* Modifiers */
+  const [activeModifiers, setActiveModifiers] = useState([]);
 
-  /* Sound toggle */
+  /* Timer */
+  const [timeLeft,    setTimeLeft]    = useState(30);
+  const timerRef     = useRef(null);
+  const submittedRef = useRef(false);
+
+  /* Sound */
   const [soundOn, setSoundOn] = useState(true);
 
-  /* ── Load question.JSON ── */
+  /* ── Load questions ── */
   useEffect(() => {
-    fetch('question.JSON')
-      .then(r => { if (!r.ok) throw new Error('not found'); return r.json(); })
-      .then(d  => { setQs(d); setQLoading(false); })
-      .catch(() => { setQError(true); setQLoading(false); });
-  }, []);
+    setQLoading(true);
+    setQError(false);
 
-  /* ── Countdown timer ── */
+    const packPromises = QUESTION_PACKS
+      .filter(p => activePacks.includes(p.id))
+      .map(p => fetch(p.file).then(r => r.ok ? r.json() : []).catch(() => []));
+
+    const reversePromise = fetch('questions/reverse.json')
+      .then(r => r.ok ? r.json() : [])
+      .catch(() => []);
+
+    Promise.all([...packPromises, reversePromise])
+      .then(results => {
+        const reversed  = results.pop();
+        const combined  = results.flat();
+        setReverseQs(reversed);
+        if (combined.length === 0 && activePacks.length > 0) {
+          setQError(true);
+        } else {
+          setQs(combined);
+        }
+        setQLoading(false);
+      })
+      .catch(() => { setQError(true); setQLoading(false); });
+  }, [activePacks]);
+
+  /* ── Timer countdown ── */
   useEffect(() => {
     clearInterval(timerRef.current);
     submittedRef.current = false;
     if (state.phase !== 'question' || !state.timerEnabled) return;
-
     setTimeLeft(state.timerSeconds);
-
     timerRef.current = setInterval(() => {
       setTimeLeft(t => {
         const next = t - 1;
@@ -628,40 +579,31 @@ function App() {
           }
           return 0;
         }
-        if (next <= 3)       SoundEngine.timerWarn();
-        else if (next <= 5)  SoundEngine.tick();
+        if (next <= 3)      SoundEngine.timerWarn();
+        else if (next <= 5) SoundEngine.tick();
         return next;
       });
     }, 1000);
-
     return () => clearInterval(timerRef.current);
   }, [state.phase, state.curAns, state.timerEnabled]);
 
-  /* ── Reveal drama (staged automatic progression) ── */
+  /* ── Reveal drama ── */
   useEffect(() => {
     if (state.phase !== 'reveal') return;
-
     if (state.revealStage === 0) {
       SoundEngine.suspense();
-      const t = setTimeout(() => dispatch({ type: 'SET_REVEAL_STAGE', stage: 1 }), 1800);
+      const t = setTimeout(() => dispatch({ type: 'SET_REVEAL_STAGE', stage: 1 }), 1900);
       return () => clearTimeout(t);
     }
-
     if (state.revealStage === 1) {
       SoundEngine.reveal();
-      /* groupWon was computed in the reducer when voting finished — no stale closure risk */
       setTimeout(() => {
-        if (state.groupWon) {
-          SoundEngine.win();
-          dispatch({ type: 'SET_CONFETTI', value: true });
-        } else {
-          SoundEngine.lose();
-        }
+        if (state.groupWon) { SoundEngine.win();  dispatch({ type: 'SET_CONFETTI', value: true }); }
+        else                { SoundEngine.lose(); }
       }, 500);
-      const t = setTimeout(() => dispatch({ type: 'SET_REVEAL_STAGE', stage: 2 }), 2200);
+      const t = setTimeout(() => dispatch({ type: 'SET_REVEAL_STAGE', stage: 2 }), 2300);
       return () => clearTimeout(t);
     }
-
     if (state.revealStage === 2) {
       const t = setTimeout(() => dispatch({ type: 'SET_REVEAL_STAGE', stage: 3 }), 900);
       return () => clearTimeout(t);
@@ -669,57 +611,90 @@ function App() {
   }, [state.phase, state.revealStage, state.groupWon]);
 
   /* ── Derived values ── */
-  const validPlayers = state.players.filter(p => p.name.trim());
-  const pc           = validPlayers.length;
-  const mInfo        = MODES.find(m => m.id === state.mode) || MODES[0];
+  const validPlayers  = state.players.filter(p => p.name.trim());
+  const pc            = validPlayers.length;
+  const mInfo         = MODES.find(m => m.id === state.mode) || MODES[0];
+  const activeModInfo = MODIFIERS.filter(m => activeModifiers.includes(m.id));
 
   /* Answering phase */
   const curAnsPlayer = state.players[state.qOrder[state.curAns]];
   const curAnsName   = curAnsPlayer?.name || '';
   const curIsImp     = state.impIdxs.includes(state.qOrder[state.curAns]);
-  const curQ         = state.qPair ? (curIsImp ? state.qPair.b : state.qPair.a) : '';
-  const ansAccent    = COLORS[state.curAns % COLORS.length];
+  const curAnsColor  = COLORS[curAnsPlayer?.colorIdx ?? (state.curAns % COLORS.length)];
+
+  /* Resolve current question */
+  let curQ = '';
+  if (state.playerVariants) {
+    curQ = state.playerVariants[curAnsName] || '';
+  } else if (state.qPair) {
+    curQ = curIsImp ? state.qPair.b : state.qPair.a;
+  }
+  /* Substitute [Player] with the chosen subject */
+  if (state.playerSubject) curQ = curQ.replace(/\[Player\]/g, state.playerSubject);
 
   /* Voting phase */
-  const voterName     = state.voteOrder[state.curVoter];
-  const voterPlayer   = state.players.find(p => p.name === voterName);
-  const voteAccent    = COLORS[(voterPlayer?.colorIdx || 0) % COLORS.length];
-  const curVoterPicks = state.votes[voterName] || (state.mode === 'doublecross' ? [] : null);
+  const voterName       = state.voteOrder[state.curVoter];
+  const voterPlayer     = state.players.find(p => p.name === voterName);
+  const voteAccent      = COLORS[(voterPlayer?.colorIdx ?? 0) % COLORS.length];
+  const curVoterPicks   = state.votes[voterName] || (state.mode === 'doublecross' ? [] : null);
 
   /* Reveal phase */
   const impNames = state.impIdxs.map(i => state.players[i]?.name).filter(Boolean);
   const groupWon = state.groupWon;
+  const isReverse = state.mode === 'reverse';
 
-  /* Accent colour for background blob */
+  /* Background blob accent */
   const accentColor =
-    ['q_handoff', 'question'].includes(state.phase)    ? ansAccent  :
+    ['q_handoff', 'question'].includes(state.phase)    ? curAnsColor  :
     ['vote_handoff', 'vote_cast'].includes(state.phase) ? voteAccent :
     mInfo.color;
 
+  /* Can start the game? */
+  const enoughQs = state.mode === 'reverse'
+    ? reverseQs.length > 0
+    : qs.length > 0;
   const canStart =
     validPlayers.length >= 2 &&
     (state.mode !== 'doublecross' || validPlayers.length >= 3) &&
-    qs.length > 0;
+    enoughQs;
 
   /* ── Handlers ── */
+  const togglePack = useCallback((id) => {
+    setActivePacks(prev =>
+      prev.includes(id)
+        ? prev.length > 1 ? prev.filter(x => x !== id) : prev  /* keep at least one */
+        : [...prev, id]
+    );
+  }, []);
+
+  const toggleModifier = useCallback((id) => {
+    setActiveModifiers(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  }, []);
+
   const handleBeginGame = useCallback(() => {
     const valid = state.players.filter(p => p.name.trim());
     if (valid.length < 2) return;
     if (state.mode === 'doublecross' && valid.length < 3) return;
-    if (qs.length === 0) return;
 
-    /* Duplicate name check */
     const lower = valid.map(p => p.name.trim().toLowerCase());
     if (lower.length !== new Set(lower).size) {
       dispatch({ type: 'SET_NAME_ERROR', error: '⚠️ Two players have the same name — each name must be unique.' });
       return;
     }
 
-    resetRNG(); /* seed the module-level RNG in gameEngine.js */
-    const roundData = createRound({ players: valid, mode: state.mode, questions: qs, used: [] });
+    resetRNG();
+    const roundData = createRound({
+      players:         valid,
+      mode:            state.mode,
+      questions:       qs,
+      reverseQuestions: reverseQs,
+      used:            [],
+    });
     dispatch({ type: 'BEGIN_GAME', validPlayers: valid, roundData });
     SoundEngine.click();
-  }, [state.players, state.mode, qs]);
+  }, [state.players, state.mode, qs, reverseQs]);
 
   const handleSubmitAnswer = useCallback(() => {
     submittedRef.current = true;
@@ -740,26 +715,22 @@ function App() {
 
   const handleNextRound = useCallback(() => {
     SoundEngine.click();
-    if (state.round >= state.totalRounds) {
-      dispatch({ type: 'GO_FINAL' });
-      return;
-    }
+    if (state.round >= state.totalRounds) { dispatch({ type: 'GO_FINAL' }); return; }
     const roundData = createRound({
-      players:   state.players,
-      mode:      state.mode,
-      questions: qs,
-      used:      state.usedIdx,
+      players:          state.players,
+      mode:             state.mode,
+      questions:        qs,
+      reverseQuestions: reverseQs,
+      used:             state.usedIdx,
     });
     dispatch({ type: 'NEXT_ROUND', roundData, newRound: state.round + 1 });
-  }, [state.round, state.totalRounds, state.players, state.mode, state.usedIdx, qs]);
+  }, [state.round, state.totalRounds, state.players, state.mode, state.usedIdx, qs, reverseQs]);
 
   const handleToggleSound = useCallback(() => {
     const next = SoundEngine.toggle();
     setSoundOn(next);
   }, []);
 
-  /* These two were previously inline useCallback calls inside JSX — a Rules of Hooks violation.
-     Hooks must always be called at the top level of a component, never inside render returns. */
   const handleShowQuestion = useCallback(() => {
     SoundEngine.click();
     dispatch({ type: 'SET_PHASE', phase: 'question' });
@@ -770,47 +741,36 @@ function App() {
     dispatch({ type: 'SET_PHASE', phase: 'vote_cast' });
   }, []);
 
-  /* ════════════════════════════════════
-     RENDER
-  ════════════════════════════════════ */
+  /* ═══════════════════ RENDER ═══════════════════ */
   return (
     <div style={S.page}>
       <BlobBG accent={accentColor} />
       <Confetti active={state.confetti} />
 
-      {/* Floating sound toggle (visible during gameplay) */}
+      {/* Sound toggle */}
       {state.phase !== 'setup' && (
-        <button onClick={handleToggleSound} style={{
-          position: 'fixed', top: 16, right: 16, zIndex: 100,
-          width: 38, height: 38, borderRadius: '50%',
-          background: '#ffffff10', border: '1px solid #ffffff20',
-          color: soundOn ? '#fff' : '#ffffff35', fontSize: 16,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>{soundOn ? '🔊' : '🔇'}</button>
+        <button onClick={handleToggleSound} style={{ position: 'fixed', top: 14, right: 14, zIndex: 100, width: 38, height: 38, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: `1px solid ${T.border}`, color: soundOn ? T.text : T.textDim, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          {soundOn ? '🔊' : '🔇'}
+        </button>
       )}
 
       {/* ════ LOADING ════ */}
       {qLoading && (
         <div style={{ textAlign: 'center', animation: 'fadeIn .5s ease' }}>
-          <div style={{ fontSize: 48, display: 'inline-block', animation: 'spin 1s linear infinite' }}>⟳</div>
-          <p style={{ color: '#ffffff70', marginTop: 12 }}>Loading questions…</p>
+          <div style={{ fontSize: 44, display: 'inline-block', animation: 'spin 1s linear infinite' }}>⟳</div>
+          <p style={{ color: T.textMid, marginTop: 12 }}>Loading questions…</p>
         </div>
       )}
 
       {/* ════ ERROR ════ */}
       {!qLoading && qError && (
         <div style={{ maxWidth: 420, width: '100%', animation: 'fadeUp .4s ease' }}>
-          <div style={{ textAlign: 'center', background: '#FF2D5514', border: '2px solid #FF2D5560', borderRadius: 20, padding: '28px 24px' }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>📂</div>
-            <h2 style={{ fontSize: 22, fontWeight: 900, color: '#FF2D55', marginBottom: 10 }}>question.JSON not found</h2>
-            <p style={{ color: '#ffffffaa', fontSize: 14, lineHeight: 1.7, marginBottom: 18 }}>
-              Make sure <code style={{ background: '#ffffff18', padding: '2px 8px', borderRadius: 6, color: '#FFD60A' }}>question.JSON</code> is
-              in the same folder as <code style={{ background: '#ffffff18', padding: '2px 8px', borderRadius: 6, color: '#FFD60A' }}>Index.HTML</code>.
+          <div style={{ textAlign: 'center', background: 'rgba(255,107,107,0.06)', border: '1.5px solid rgba(255,107,107,0.35)', borderRadius: T.rx, padding: '28px 24px' }}>
+            <div style={{ fontSize: 46, marginBottom: 12 }}>📂</div>
+            <h2 style={{ fontSize: 20, fontWeight: 900, color: '#FF6B6B', marginBottom: 10 }}>Question files not found</h2>
+            <p style={{ color: T.textMid, fontSize: 14, lineHeight: 1.7 }}>
+              Make sure the <code style={{ background: 'rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: 6, color: '#FFCB47' }}>questions/</code> folder is alongside <code style={{ background: 'rgba(255,255,255,0.08)', padding: '2px 8px', borderRadius: 6, color: '#FFCB47' }}>index.html</code>.
             </p>
-            <div style={{ background: '#ffffff0a', border: '1px solid #ffffff18', borderRadius: 14, padding: '16px', textAlign: 'left' }}>
-              <p style={{ color: '#FFD60A', fontWeight: 800, marginBottom: 8, fontSize: 13 }}>question.JSON format:</p>
-              <pre style={{ color: '#ffffffcc', fontSize: 12, lineHeight: 1.7, overflowX: 'auto' }}>{`[\n  {\n    "a": "Question for most players",\n    "b": "Question for the imposter"\n  }\n]`}</pre>
-            </div>
           </div>
         </div>
       )}
@@ -820,52 +780,28 @@ function App() {
         <div style={{ ...S.card, animation: 'fadeUp .35s ease both' }}>
 
           {/* Title */}
-          <div style={{ textAlign: 'center', marginBottom: 24 }}>
-            <div style={{
-              fontSize: 64, display: 'inline-block', marginBottom: 4,
-              filter: 'drop-shadow(0 0 28px #FF2D5599) drop-shadow(0 0 70px #FF9F0A44)',
-              animation: 'bounce 2.5s ease-in-out infinite',
-            }}>🕵️</div>
-            <h1 style={{
-              fontSize: 58, fontWeight: 900, letterSpacing: '-3px', lineHeight: 1,
-              background: 'linear-gradient(135deg, #FF2D55 0%, #FF9F0A 55%, #FFD60A 100%)',
-              backgroundSize: '200% auto',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-              animation: 'shimmer 4s linear infinite',
-            }}>OUTLIER</h1>
-            <p style={{ color: '#ffffff38', fontSize: 10, letterSpacing: 6, textTransform: 'uppercase', marginTop: 6, fontWeight: 800 }}>
-              Party Game · 2–10 Players
-            </p>
+          <div style={{ textAlign: 'center', marginBottom: 28 }}>
+            <div style={{ fontSize: 56, display: 'inline-block', marginBottom: 2, filter: 'drop-shadow(0 0 22px rgba(99,102,241,0.5))', animation: 'bounce 3s ease-in-out infinite' }}>🕵️</div>
+            <h1 className="title-gradient" style={{ fontSize: 54, fontWeight: 900, letterSpacing: '-2.5px', lineHeight: 1, margin: 0 }}>OUTLIER</h1>
+            <p style={{ color: T.textDim, fontSize: 10, letterSpacing: 5, textTransform: 'uppercase', marginTop: 8, fontWeight: 700 }}>Party Game · 2–10 Players</p>
           </div>
 
           {/* Mode */}
           <p style={S.lbl}>Game Mode</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 22 }}>
             {MODES.map(m => {
               const sel = state.mode === m.id;
               return (
                 <button key={m.id} onClick={() => { SoundEngine.click(); dispatch({ type: 'SET_MODE', mode: m.id }); }} style={D.modePill(m.color, sel)}>
-                  <span style={{ fontSize: 28, flexShrink: 0 }}>{m.emoji}</span>
+                  <span style={{ fontSize: 26, flexShrink: 0 }}>{m.emoji}</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                      <span style={{ fontSize: 15, fontWeight: 900, color: sel ? m.color : '#fff' }}>{m.name}</span>
-                      {m.min && (
-                        <span style={{
-                          fontSize: 9, fontWeight: 800, letterSpacing: 1.5, color: m.color,
-                          background: m.color + '20', border: `1px solid ${m.color}50`,
-                          borderRadius: 6, padding: '2px 7px', textTransform: 'uppercase',
-                        }}>3+ players</span>
-                      )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: sel ? m.color : T.text }}>{m.name}</span>
+                      {m.min && <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1.5, color: m.color, background: m.color + '18', border: `1px solid ${m.color}40`, borderRadius: 6, padding: '2px 7px', textTransform: 'uppercase' }}>3+</span>}
                     </div>
-                    <span style={{ fontSize: 12, color: '#ffffff50', lineHeight: 1.4 }}>{m.tagline}</span>
+                    <span style={{ fontSize: 12, color: T.textDim, lineHeight: 1.4 }}>{m.tagline}</span>
                   </div>
-                  <div style={{
-                    width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-                    background: sel ? m.color : '#ffffff12',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 12, fontWeight: 900, color: '#fff',
-                    boxShadow: sel ? `0 0 14px ${m.color}` : 'none', transition: 'all .2s',
-                  }}>{sel ? '✓' : ''}</div>
+                  <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, background: sel ? m.color : 'rgba(255,255,255,0.07)', border: `1.5px solid ${sel ? m.color : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900, color: '#fff', boxShadow: sel ? `0 0 10px ${m.color}` : 'none', transition: 'all .18s' }}>{sel ? '✓' : ''}</div>
                 </button>
               );
             })}
@@ -873,62 +809,73 @@ function App() {
 
           {/* Rounds */}
           <p style={S.lbl}>Rounds</p>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
             {[3, 5, 7, 10].map(n => {
               const sel = state.totalRounds === n;
               return (
-                <button key={n} onClick={() => { SoundEngine.click(); dispatch({ type: 'SET_ROUNDS', rounds: n }); }} style={{
-                  flex: 1, padding: '13px 4px', borderRadius: 12, fontWeight: 900, fontSize: 16,
-                  border:     `2px solid ${sel ? '#BF5AF2' : '#ffffff18'}`,
-                  background: sel ? 'linear-gradient(135deg, #BF5AF230, #BF5AF210)' : '#ffffff08',
-                  color:      sel ? '#BF5AF2' : '#ffffff55',
-                  boxShadow:  sel ? '0 0 20px #BF5AF248' : 'none',
-                  transition: 'all .2s', fontFamily: 'inherit', cursor: 'pointer',
-                }}>{n}</button>
+                <button key={n} onClick={() => { SoundEngine.click(); dispatch({ type: 'SET_ROUNDS', rounds: n }); }} style={{ flex: 1, padding: '13px 4px', borderRadius: 12, fontWeight: 900, fontSize: 16, border: `1px solid ${sel ? '#C084FC55' : T.border}`, background: sel ? 'rgba(192,132,252,0.12)' : T.surface, color: sel ? '#C084FC' : T.textMid, boxShadow: sel ? '0 0 0 1px rgba(192,132,252,0.2)' : 'none', transition: 'all .18s', fontFamily: 'inherit', cursor: 'pointer' }}>{n}</button>
               );
             })}
           </div>
 
-          {/* Timer toggle */}
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '12px 16px', borderRadius: 14, marginBottom: 20,
-            background:  state.timerEnabled ? '#FF9F0A14' : '#ffffff08',
-            border:      `1.5px solid ${state.timerEnabled ? '#FF9F0A50' : '#ffffff18'}`,
-            transition:  'all .2s',
-          }}>
+          {/* Timer */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', borderRadius: T.r, marginBottom: 18, background: state.timerEnabled ? 'rgba(255,159,69,0.08)' : T.surface, border: `1px solid ${state.timerEnabled ? 'rgba(255,159,69,0.3)' : T.border}`, transition: 'all .2s' }}>
             <div>
-              <span style={{ fontWeight: 800, fontSize: 14, color: state.timerEnabled ? '#FF9F0A' : '#ffffffcc' }}>
-                ⏱ Timer Mode
-              </span>
-              <span style={{ display: 'block', fontSize: 11, color: '#ffffff50', marginTop: 2 }}>
-                {state.timerEnabled ? `${state.timerSeconds}s per question` : 'Players answer at their own pace'}
-              </span>
+              <span style={{ fontWeight: 800, fontSize: 14, color: state.timerEnabled ? '#FF9F45' : T.text }}>⏱ Timer Mode</span>
+              <span style={{ display: 'block', fontSize: 11, color: T.textDim, marginTop: 2 }}>{state.timerEnabled ? `${state.timerSeconds}s per question` : 'Players answer at their own pace'}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               {state.timerEnabled && (
-                <div style={{ display: 'flex', gap: 5 }}>
+                <div style={{ display: 'flex', gap: 4 }}>
                   {[20, 30, 45, 60].map(s => {
                     const sel = state.timerSeconds === s;
                     return (
-                      <button key={s} onClick={() => dispatch({ type: 'SET_TIMER_SECONDS', seconds: s })} style={{
-                        padding: '4px 7px', borderRadius: 7, fontSize: 11, fontWeight: 800,
-                        border:     `1.5px solid ${sel ? '#FF9F0A' : '#ffffff25'}`,
-                        background: sel ? '#FF9F0A25' : 'transparent',
-                        color:      sel ? '#FF9F0A' : '#ffffff55',
-                        fontFamily: 'inherit', cursor: 'pointer',
-                      }}>{s}s</button>
+                      <button key={s} onClick={() => dispatch({ type: 'SET_TIMER_SECONDS', seconds: s })} style={{ padding: '4px 7px', borderRadius: 7, fontSize: 11, fontWeight: 800, border: `1px solid ${sel ? '#FF9F45' : T.border}`, background: sel ? 'rgba(255,159,69,0.18)' : 'transparent', color: sel ? '#FF9F45' : T.textMid, fontFamily: 'inherit', cursor: 'pointer' }}>{s}s</button>
                     );
                   })}
                 </div>
               )}
-              {/* Toggle switch */}
-              <button className="toggle-track"
-                onClick={() => dispatch({ type: 'TOGGLE_TIMER' })}
-                style={{ background: state.timerEnabled ? '#FF9F0A' : '#ffffff25' }}>
+              <button className="toggle-track" onClick={() => dispatch({ type: 'TOGGLE_TIMER' })} style={{ background: state.timerEnabled ? '#FF9F45' : 'rgba(255,255,255,0.12)' }}>
                 <div className="toggle-thumb" style={{ left: state.timerEnabled ? 21 : 3 }} />
               </button>
             </div>
+          </div>
+
+          {/* Modifiers */}
+          <p style={S.lbl}>Modifiers</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 22 }}>
+            {MODIFIERS.map(mod => {
+              const active = activeModifiers.includes(mod.id);
+              return (
+                <button key={mod.id} onClick={() => toggleModifier(mod.id)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 99, border: `1px solid ${active ? 'rgba(251,191,36,0.4)' : T.border}`, background: active ? 'rgba(251,191,36,0.1)' : T.surface, color: active ? '#FBBF24' : T.textMid, fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', transition: 'all .18s' }}>
+                  <span>{mod.emoji}</span><span>{mod.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Question Packs */}
+          <p style={S.lbl}>Question Packs</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 22 }}>
+            {QUESTION_PACKS.map(pack => {
+              const active = activePacks.includes(pack.id);
+              const isOnlyOne = activePacks.length === 1 && active;
+              return (
+                <button key={pack.id} onClick={() => { if (!isOnlyOne) togglePack(pack.id); }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderRadius: T.r, border: `1px solid ${active ? 'rgba(77,166,255,0.35)' : T.border}`, background: active ? 'rgba(77,166,255,0.08)' : T.surface, textAlign: 'left', width: '100%', fontFamily: 'inherit', cursor: isOnlyOne ? 'default' : 'pointer', opacity: isOnlyOne ? 0.7 : 1, transition: 'all .18s' }}>
+                  <span style={{ fontSize: 22, flexShrink: 0 }}>{pack.emoji}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: active ? '#4DA6FF' : T.text, marginBottom: 2 }}>{pack.label}</div>
+                    <div style={{ fontSize: 11, color: T.textDim }}>{pack.desc}</div>
+                  </div>
+                  <div style={{ width: 20, height: 20, borderRadius: '50%', flexShrink: 0, background: active ? '#4DA6FF' : 'rgba(255,255,255,0.07)', border: `1.5px solid ${active ? '#4DA6FF' : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, color: '#fff', transition: 'all .18s' }}>{active ? '✓' : ''}</div>
+                </button>
+              );
+            })}
+            {state.mode === 'reverse' && (
+              <div style={{ padding: '10px 14px', borderRadius: T.r, border: '1px solid rgba(86,207,178,0.3)', background: 'rgba(86,207,178,0.06)', fontSize: 12, color: 'rgba(86,207,178,0.85)', fontWeight: 600 }}>
+                🔄 Reverse mode uses its own built-in question pack automatically.
+              </div>
+            )}
           </div>
 
           {/* Players */}
@@ -938,24 +885,17 @@ function App() {
               const col = COLORS[player.colorIdx];
               return (
                 <div key={player.id} style={{ display: 'flex', gap: 9, alignItems: 'center' }}>
-                  <div style={{
-                    width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-                    background: col + '25', border: `2px solid ${col}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 12, fontWeight: 900, color: col, boxShadow: `0 0 12px ${col}45`,
-                  }}>{i + 1}</div>
+                  <div style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, background: col + '18', border: `1.5px solid ${col}55`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: col }}>{i + 1}</div>
                   <input
                     value={player.name}
                     onChange={e => dispatch({ type: 'UPDATE_PLAYER_NAME', id: player.id, name: e.target.value })}
-                    placeholder={`Player ${i + 1}`} style={S.inp}
-                    onFocus={e => { e.target.style.borderColor = col;         e.target.style.background = col + '18'; }}
-                    onBlur={e  => { e.target.style.borderColor = '#ffffff22'; e.target.style.background = '#ffffff0e'; }}
+                    placeholder={`Player ${i + 1}`}
+                    style={S.inp}
+                    onFocus={e => { e.target.style.borderColor = col; e.target.style.boxShadow = `0 0 0 3px ${col}18`; }}
+                    onBlur={e  => { e.target.style.borderColor = T.border; e.target.style.boxShadow = 'none'; }}
                   />
                   {state.players.length > 2 && (
-                    <button
-                      onClick={() => dispatch({ type: 'REMOVE_PLAYER', id: player.id })}
-                      style={{ background: 'none', border: 'none', color: '#ffffff40', fontSize: 24, padding: '0 4px', lineHeight: 1, cursor: 'pointer' }}
-                    >×</button>
+                    <button onClick={() => dispatch({ type: 'REMOVE_PLAYER', id: player.id })} style={{ background: 'none', border: 'none', color: T.textDim, fontSize: 22, padding: '0 4px', lineHeight: 1, cursor: 'pointer' }}>×</button>
                   )}
                 </div>
               );
@@ -963,17 +903,12 @@ function App() {
           </div>
 
           {state.nameError && (
-            <p style={{ color: '#FF2D55cc', fontSize: 12, textAlign: 'center', fontWeight: 700, marginBottom: 10, animation: 'fadeIn .3s ease' }}>
-              {state.nameError}
-            </p>
+            <p style={{ color: 'rgba(255,107,107,0.85)', fontSize: 12, textAlign: 'center', fontWeight: 700, marginBottom: 12, animation: 'fadeIn .3s ease' }}>{state.nameError}</p>
           )}
 
           <div style={{ display: 'flex', gap: 9, marginBottom: 12 }}>
             {state.players.length < 10 && (
-              <button
-                onClick={() => dispatch({ type: 'ADD_PLAYER' })}
-                style={{ flex: 1, padding: '12px', borderRadius: 12, border: '2px solid #ffffff22', background: 'transparent', color: '#ffffff65', fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}
-              >+ Add Player</button>
+              <button onClick={() => dispatch({ type: 'ADD_PLAYER' })} style={{ flex: 1, padding: '12px', borderRadius: 13, border: `1px solid ${T.border}`, background: T.surface, color: T.textMid, fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>+ Add Player</button>
             )}
             <button onClick={handleBeginGame} disabled={!canStart} style={{ ...D.btn('grad', false, false, !canStart), flex: 2 }}>
               START GAME →
@@ -981,92 +916,70 @@ function App() {
           </div>
 
           {state.mode === 'doublecross' && validPlayers.length < 3 && (
-            <p style={{ color: '#FF2D55bb', fontSize: 12, textAlign: 'center', fontWeight: 700, animation: 'pulse 1.5s infinite' }}>
-              ⚠️ Double Cross needs at least 3 players
-            </p>
+            <p style={{ color: 'rgba(255,107,107,0.8)', fontSize: 12, textAlign: 'center', fontWeight: 700, animation: 'pulse 1.5s infinite' }}>⚠️ Double Cross needs at least 3 players</p>
+          )}
+          {state.mode !== 'reverse' && qs.length === 0 && !qLoading && (
+            <p style={{ color: 'rgba(255,159,69,0.8)', fontSize: 12, textAlign: 'center', fontWeight: 700 }}>⚠️ Select at least one question pack to play</p>
           )}
         </div>
       )}
 
       {/* ════ QUESTION HANDOFF ════ */}
       {state.phase === 'q_handoff' && (
-        <LockScreen
-          name={curAnsName} color={ansAccent}
-          sub={`Round ${state.round} of ${state.totalRounds} · Question Phase`}
-          btnLabel="Show My Question →"
-          onReady={handleShowQuestion}
-        />
+        <LockScreen name={curAnsName} color={curAnsColor} sub={`Round ${state.round} of ${state.totalRounds} · Question Phase`} btnLabel="Show My Question →" onReady={handleShowQuestion} />
       )}
 
       {/* ════ QUESTION ════ */}
       {state.phase === 'question' && (
         <div style={{ ...S.card, textAlign: 'center', animation: 'slideR .3s ease both' }}>
-
-          {/* Mode + round pill */}
+          {/* Mode pill */}
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-            <div style={{
-              background: `linear-gradient(135deg, ${mInfo.color}28, ${mInfo.color}10)`,
-              border: `1.5px solid ${mInfo.color}55`, borderRadius: 20,
-              padding: '5px 14px', display: 'flex', alignItems: 'center', gap: 6,
-            }}>
+            <div style={{ background: `${mInfo.color}18`, border: `1px solid ${mInfo.color}40`, borderRadius: 99, padding: '5px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 12 }}>{mInfo.emoji}</span>
-              <span style={{ fontSize: 10, fontWeight: 800, color: mInfo.color, letterSpacing: 2, textTransform: 'uppercase' }}>
-                {mInfo.name} · Round {state.round}/{state.totalRounds}
-              </span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: mInfo.color, letterSpacing: 2, textTransform: 'uppercase' }}>{mInfo.name} · Round {state.round}/{state.totalRounds}</span>
             </div>
           </div>
 
-          <PBar total={pc} current={state.curAns} accent={ansAccent} />
+          <PBar total={pc} current={state.curAns} accent={curAnsColor} />
 
           <p style={{ ...S.lbl, textAlign: 'center' }}>Answering</p>
-          <h2 style={{
-            fontSize: 44, fontWeight: 900, margin: '0 0 4px', letterSpacing: '-1.5px',
-            color: ansAccent, textShadow: `0 0 40px ${ansAccent}, 0 0 80px ${ansAccent}50`,
-          }}>{curAnsName}</h2>
-          <p style={{ color: '#ffffff40', fontSize: 13, marginBottom: 18, fontWeight: 600 }}>
-            {state.curAns + 1} of {pc}
-          </p>
+          <h2 style={{ fontSize: 42, fontWeight: 900, margin: '0 0 4px', letterSpacing: '-1.5px', color: curAnsColor, textShadow: `0 0 30px ${curAnsColor}70` }}>{curAnsName}</h2>
+          <p style={{ color: T.textDim, fontSize: 13, marginBottom: 18, fontWeight: 600 }}>{state.curAns + 1} of {pc}</p>
 
-          {/* Timer bar */}
-          {state.timerEnabled && <TimerBar timeLeft={timeLeft} total={state.timerSeconds} accent={ansAccent} />}
+          {state.timerEnabled && <TimerBar timeLeft={timeLeft} total={state.timerSeconds} accent={curAnsColor} />}
 
-          {/* Imposter alert (Undercover / Double Cross only) */}
-          {curIsImp && state.mode !== 'clueless' && (
-            <div style={{
-              background: 'linear-gradient(135deg, #FF2D5522, #FF2D550a)',
-              border: '2px solid #FF2D55', borderRadius: 16, padding: '13px 16px', marginBottom: 14,
-              boxShadow: '0 0 38px #FF2D5548', animation: 'popIn .35s ease both',
-            }}>
-              <p style={{ fontSize: 17, fontWeight: 900, margin: '0 0 4px', color: '#FF2D55' }}>🎭 You are the imposter!</p>
-              <p style={{ fontSize: 12, color: '#ffffff70', margin: 0, lineHeight: 1.5 }}>
-                {state.mode === 'doublecross'
-                  ? "There's one other imposter — but you don't know who. Blend in!"
-                  : "Blend in with your answer. Don't get caught!"}
+          {/* Modifiers */}
+          <ModifierBanner modifiers={activeModInfo} />
+
+          {/* Imposter alert */}
+          {curIsImp && state.mode !== 'clueless' && state.mode !== 'reverse' && (
+            <div style={{ background: 'rgba(255,107,107,0.08)', border: '1.5px solid rgba(255,107,107,0.5)', borderRadius: T.r, padding: '13px 16px', marginBottom: 14, boxShadow: '0 0 30px rgba(255,107,107,0.2)', animation: 'popIn .35s ease both' }}>
+              <p style={{ fontSize: 16, fontWeight: 900, margin: '0 0 4px', color: '#FF6B6B' }}>🎭 You are the outlier!</p>
+              <p style={{ fontSize: 12, color: T.textMid, margin: 0, lineHeight: 1.5 }}>
+                {state.mode === 'doublecross' ? "There's one other outlier — but you don't know who. Blend in!" : "Blend in with your answer. Don't get caught!"}
               </p>
             </div>
           )}
 
+          {/* Reverse mode context */}
+          {isReverse && (
+            <div style={{ background: 'rgba(86,207,178,0.07)', border: '1px solid rgba(86,207,178,0.3)', borderRadius: T.r, padding: '10px 14px', marginBottom: 14 }}>
+              <p style={{ fontSize: 12, color: 'rgba(86,207,178,0.8)', margin: 0, fontWeight: 600 }}>🔄 Everyone gets a different question — but two players share the same one. After voting, find the pair!</p>
+            </div>
+          )}
+
           {/* Question card */}
-          <div style={{
-            background: `linear-gradient(135deg, ${ansAccent}20, ${ansAccent}08)`,
-            border: `2px solid ${ansAccent}`, borderRadius: 20, padding: '22px 18px', marginBottom: 16,
-            boxShadow: `0 0 40px ${ansAccent}35, inset 0 0 30px ${ansAccent}08`,
-          }}>
-            <p style={{ ...S.lbl, textAlign: 'center', color: ansAccent + 'bb', marginBottom: 10 }}>Your question</p>
-            <p style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.5, color: '#fff', margin: 0 }}>{curQ}</p>
+          <div style={{ background: `${curAnsColor}14`, border: `1.5px solid ${curAnsColor}45`, borderRadius: T.rl, padding: '22px 18px', marginBottom: 16, boxShadow: `0 0 30px ${curAnsColor}20` }}>
+            <p style={{ ...S.lbl, textAlign: 'center', color: curAnsColor + 'cc', marginBottom: 10 }}>Your question</p>
+            <p style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.55, color: T.text, margin: 0 }}>{curQ}</p>
           </div>
 
           <div style={{ textAlign: 'left', marginBottom: 14 }}>
             <label style={S.lbl}>Your answer</label>
-            <textarea
-              value={state.writing}
-              onChange={e => dispatch({ type: 'SET_WRITING', value: e.target.value })}
-              placeholder="Type your answer…" rows={3}
-              style={{ ...S.inp, border: `2px solid ${ansAccent}60`, lineHeight: 1.6, boxShadow: `0 0 18px ${ansAccent}22` }}
-            />
+            <textarea value={state.writing} onChange={e => dispatch({ type: 'SET_WRITING', value: e.target.value })} placeholder="Type your answer…" rows={3} style={{ ...S.inp, border: `1.5px solid ${curAnsColor}50`, lineHeight: 1.6, boxShadow: `0 0 0 3px ${curAnsColor}10` }} />
           </div>
 
-          <PBtn col={ansAccent} onClick={handleSubmitAnswer}>
+          <PBtn col={curAnsColor} onClick={handleSubmitAnswer}>
             {state.curAns + 1 < pc ? 'Done — pass the phone →' : 'All answered — start voting!'}
           </PBtn>
         </div>
@@ -1074,35 +987,26 @@ function App() {
 
       {/* ════ VOTE HANDOFF ════ */}
       {state.phase === 'vote_handoff' && (
-        <LockScreen
-          name={voterName} color={voteAccent}
-          sub={`Voting · ${state.curVoter + 1} of ${pc}`}
-          btnLabel="Show Answers & Vote →"
-          onReady={handleShowVote}
-        />
+        <LockScreen name={voterName} color={voteAccent} sub={`Voting · ${state.curVoter + 1} of ${pc}`} btnLabel="Show Answers & Vote →" onReady={handleShowVote} />
       )}
 
       {/* ════ VOTE CAST ════ */}
       {state.phase === 'vote_cast' && (
         <div style={{ ...S.card, animation: 'slideR .3s ease both' }}>
-
           <div style={{ textAlign: 'center', marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-              <div style={{
-                background: `linear-gradient(135deg, ${voteAccent}30, ${voteAccent}10)`,
-                border: `2px solid ${voteAccent}`, borderRadius: 20,
-                padding: '7px 16px', display: 'flex', alignItems: 'center', gap: 8,
-                boxShadow: `0 0 22px ${voteAccent}38`,
-              }}>
-                <div style={{ ...D.avatar(voteAccent, 26), fontSize: 11 }}>{voterName?.[0]?.toUpperCase()}</div>
+              <div style={{ background: `${voteAccent}20`, border: `1.5px solid ${voteAccent}55`, borderRadius: 99, padding: '7px 16px', display: 'flex', alignItems: 'center', gap: 8, boxShadow: `0 0 20px ${voteAccent}25` }}>
+                <div style={D.avatar(voteAccent, 26)}>{voterName?.[0]?.toUpperCase()}</div>
                 <span style={{ fontSize: 14, fontWeight: 800, color: voteAccent }}>{voterName}'s vote</span>
-                <span style={{ fontSize: 10, color: voteAccent + '80', letterSpacing: 1 }}>({state.curVoter + 1}/{pc})</span>
+                <span style={{ fontSize: 10, color: voteAccent + '70', letterSpacing: 1 }}>({state.curVoter + 1}/{pc})</span>
               </div>
             </div>
-            <p style={{ color: '#ffffff55', fontSize: 13, fontWeight: 600 }}>
+            <p style={{ color: T.textMid, fontSize: 13, fontWeight: 600 }}>
               {state.mode === 'doublecross'
-                ? 'Tap to pick your 2 suspects — both could be imposters!'
-                : 'Tap who you think has the different question'}
+                ? 'Pick your 2 suspects — both could be outliers!'
+                : isReverse
+                  ? 'Vote for who you think had the same question as someone else'
+                  : 'Tap who you think had the different question'}
             </p>
           </div>
 
@@ -1114,32 +1018,14 @@ function App() {
               const picked = picks.includes(player.name);
               const isSelf = player.name === voterName;
               return (
-                <div key={player.id} onClick={() => { if (!isSelf) handleCastVote(player.name); }} style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 12, padding: '13px 15px', borderRadius: 16,
-                  cursor:     isSelf ? 'default' : 'pointer',
-                  background: picked ? `linear-gradient(135deg, ${col}28, ${col}10)` : 'linear-gradient(135deg, #ffffff0e, #ffffff05)',
-                  border:     `2px solid ${picked ? col : isSelf ? '#ffffff0d' : '#ffffff18'}`,
-                  boxShadow:  picked ? `0 0 24px ${col}55` : 'none',
-                  transition: 'all .18s', opacity: isSelf ? 0.5 : 1,
-                }}>
-                  <div style={{ ...D.avatar(col), boxShadow: picked ? `0 0 16px ${col}70` : `0 0 8px ${col}30` }}>
-                    {player.name[0]?.toUpperCase()}
-                  </div>
+                <div key={player.id} onClick={() => { if (!isSelf) handleCastVote(player.name); }} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '13px 15px', borderRadius: T.r, cursor: isSelf ? 'default' : 'pointer', background: picked ? `${col}14` : 'rgba(255,255,255,0.03)', border: `1px solid ${picked ? col + '55' : isSelf ? T.border : T.border}`, boxShadow: picked ? `0 0 0 1px ${col}20, 0 6px 20px ${col}20` : 'none', transition: 'all .18s', opacity: isSelf ? 0.45 : 1 }}>
+                  <div style={D.avatar(col)}>{player.name[0]?.toUpperCase()}</div>
                   <div style={{ flex: 1 }}>
-                    <p style={{ margin: 0, fontWeight: 800, fontSize: 13, color: picked ? col : col + 'cc' }}>
-                      {player.name}{isSelf ? ' (you)' : ''}
-                    </p>
-                    <p style={{ margin: '3px 0 0', fontSize: 14, color: isSelf ? '#ffffff40' : '#ffffffd0', fontStyle: isSelf ? 'italic' : 'normal' }}>
-                      {state.answers[player.name] || '…'}
-                    </p>
+                    <p style={{ margin: 0, fontWeight: 800, fontSize: 13, color: picked ? col : T.textMid }}>{player.name}{isSelf ? ' (you)' : ''}</p>
+                    <p style={{ margin: '3px 0 0', fontSize: 14, color: isSelf ? T.textDim : T.text, fontStyle: isSelf ? 'italic' : 'normal' }}>{state.answers[player.name] || '…'}</p>
                   </div>
                   {!isSelf && (
-                    <div style={{
-                      width: 24, height: 24, borderRadius: '50%', flexShrink: 0, alignSelf: 'center',
-                      background: picked ? col : '#ffffff12', border: `2px solid ${picked ? col : '#ffffff22'}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 12, fontWeight: 900, boxShadow: picked ? `0 0 14px ${col}` : 'none', transition: 'all .18s',
-                    }}>{picked ? '✓' : ''}</div>
+                    <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, alignSelf: 'center', background: picked ? col : 'rgba(255,255,255,0.07)', border: `1.5px solid ${picked ? col : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900, color: '#fff', boxShadow: picked ? `0 0 10px ${col}` : 'none', transition: 'all .18s' }}>{picked ? '✓' : ''}</div>
                   )}
                 </div>
               );
@@ -1147,18 +1033,12 @@ function App() {
           </div>
 
           {state.mode === 'doublecross' && (curVoterPicks || []).length < 2 && (
-            <div style={{
-              background: '#FF9F0A18', border: '1px solid #FF9F0A45', borderRadius: 10,
-              padding: '8px 14px', marginBottom: 12, textAlign: 'center',
-              fontSize: 12, color: '#FF9F0A', fontWeight: 800, animation: 'pulse 1.5s infinite',
-            }}>
+            <div style={{ background: 'rgba(255,159,69,0.08)', border: '1px solid rgba(255,159,69,0.3)', borderRadius: 10, padding: '8px 14px', marginBottom: 12, textAlign: 'center', fontSize: 12, color: '#FF9F45', fontWeight: 800, animation: 'pulse 1.5s infinite' }}>
               Select {2 - (curVoterPicks || []).length} more suspect{(curVoterPicks || []).length === 1 ? '' : 's'}
             </div>
           )}
 
-          <PBtn col={voteAccent}
-            dis={state.mode === 'doublecross' ? (curVoterPicks || []).length !== 2 : curVoterPicks == null}
-            onClick={handleConfirmVote}>
+          <PBtn col={voteAccent} dis={state.mode === 'doublecross' ? (curVoterPicks || []).length !== 2 : curVoterPicks == null} onClick={handleConfirmVote}>
             {state.curVoter + 1 < pc ? 'Confirm Vote — pass the phone →' : 'Confirm Vote — see results!'}
           </PBtn>
         </div>
@@ -1168,66 +1048,50 @@ function App() {
       {state.phase === 'reveal' && (
         <div style={{ ...S.card, animation: 'fadeUp .35s ease both' }}>
 
-          {/* Stage 0 — Suspense spinner */}
+          {/* Stage 0 — suspense */}
           {state.revealStage === 0 && (
             <div style={{ textAlign: 'center', padding: '44px 20px', animation: 'fadeIn .4s ease' }}>
-              <div style={{ fontSize: 72, marginBottom: 20, display: 'inline-block', animation: 'spin 2s linear infinite' }}>🎭</div>
-              <h2 style={{ fontSize: 26, fontWeight: 900, color: '#ffffff80', marginBottom: 8 }}>
-                {impNames.length > 1 ? 'Revealing the imposters…' : 'Revealing the imposter…'}
+              <div style={{ fontSize: 68, marginBottom: 20, display: 'inline-block', animation: 'spin 2.2s linear infinite' }}>🎭</div>
+              <h2 style={{ fontSize: 22, fontWeight: 900, color: T.textMid, marginBottom: 8 }}>
+                {isReverse ? 'Revealing the matching pair…' : impNames.length > 1 ? 'Revealing the outliers…' : 'Revealing the outlier…'}
               </h2>
-              <p style={{ color: '#ffffff40', fontSize: 14 }}>
-                {impNames.length > 1 ? 'Two people had a different question…' : 'One person had a different question…'}
-              </p>
               <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 24 }}>
-                {[0, 1, 2].map(i => (
-                  <div key={i} style={{
-                    width: 8, height: 8, borderRadius: '50%', background: '#ffffff40',
-                    animation: `pulse 1s ease-in-out ${i * 0.33}s infinite`,
-                  }} />
-                ))}
+                {[0, 1, 2].map(i => <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.25)', animation: `pulse 1s ease-in-out ${i * 0.33}s infinite` }} />)}
               </div>
             </div>
           )}
 
-          {/* Stage 1+ — Win/lose banner with name */}
+          {/* Stage 1+ — result banner */}
           {state.revealStage >= 1 && (
-            <div style={{
-              background: groupWon
-                ? 'linear-gradient(135deg, #30D15822, #30D15808)'
-                : 'linear-gradient(135deg, #FF2D5522, #FF2D5508)',
-              border:       `2px solid ${groupWon ? '#30D158' : '#FF2D55'}`,
-              borderRadius: 22, padding: '24px 20px', textAlign: 'center', marginBottom: 16,
-              boxShadow:    `0 0 60px ${groupWon ? '#30D15840' : '#FF2D5540'}`,
-              animation:    'popIn .5s ease both',
-            }}>
-              <div style={{ fontSize: 52, marginBottom: 8, animation: groupWon ? 'bounce .8s ease-in-out infinite' : 'none' }}>
-                {groupWon ? '🎉' : '😈'}
-              </div>
-              <p style={{ fontSize: 10, letterSpacing: 4, textTransform: 'uppercase', color: '#ffffff50', fontWeight: 800, marginBottom: 8 }}>
-                {impNames.length > 1 ? 'The imposters were' : 'The imposter was'}
+            <div style={{ background: groupWon ? 'rgba(52,211,153,0.07)' : 'rgba(255,107,107,0.07)', border: `1.5px solid ${groupWon ? 'rgba(52,211,153,0.4)' : 'rgba(255,107,107,0.4)'}`, borderRadius: T.rx, padding: '24px 20px', textAlign: 'center', marginBottom: 16, boxShadow: `0 0 50px ${groupWon ? 'rgba(52,211,153,0.2)' : 'rgba(255,107,107,0.2)'}`, animation: 'popIn .5s ease both' }}>
+              <div style={{ fontSize: 50, marginBottom: 10, animation: groupWon ? 'bounce .9s ease-in-out infinite' : 'none' }}>{groupWon ? '🎉' : '😈'}</div>
+              <p style={{ fontSize: 10, letterSpacing: 3.5, textTransform: 'uppercase', color: T.textDim, fontWeight: 700, marginBottom: 8 }}>
+                {isReverse ? 'The matching pair was' : impNames.length > 1 ? 'The outliers were' : 'The outlier was'}
               </p>
-              <h2 style={{
-                fontSize: impNames.length > 1 ? 30 : 44, fontWeight: 900,
-                margin: '0 0 12px', letterSpacing: '-1px',
-                color: groupWon ? '#30D158' : '#FF2D55',
-                textShadow: `0 0 60px ${groupWon ? '#30D158aa' : '#FF2D55aa'}`,
-                animation: 'revealName .7s ease both, glow 2s ease-in-out 1s infinite',
-              }}>
+              <h2 style={{ fontSize: impNames.length > 1 ? 30 : 42, fontWeight: 900, margin: '0 0 14px', letterSpacing: '-1px', color: groupWon ? '#34D399' : '#FF6B6B', textShadow: `0 0 50px ${groupWon ? '#34D39988' : '#FF6B6B88'}`, animation: 'revealName .7s ease both' }}>
                 {impNames.join(' & ')}
               </h2>
-              <div style={{ background: '#ffffff0c', borderRadius: 12, padding: '12px 14px', marginBottom: 10, textAlign: 'left' }}>
-                <p style={{ fontSize: 9, color: '#ffffff45', letterSpacing: 3, textTransform: 'uppercase', fontWeight: 800, marginBottom: 5 }}>Their question was</p>
-                <p style={{ fontSize: 14, fontStyle: 'italic', color: '#ffffffcc', lineHeight: 1.5 }}>"{state.qPair?.b}"</p>
+              <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: '12px 14px', marginBottom: 10, textAlign: 'left', border: `1px solid ${T.border}` }}>
+                <p style={{ fontSize: 9, color: T.textDim, letterSpacing: 3, textTransform: 'uppercase', fontWeight: 700, marginBottom: 5 }}>
+                  {isReverse ? 'Their shared question was' : 'Their question was'}
+                </p>
+                <p style={{ fontSize: 13, fontStyle: 'italic', color: T.textMid, lineHeight: 1.55 }}>"{state.qPair?.b}"</p>
               </div>
-              <p style={{ fontSize: 11, color: '#ffffff45', marginBottom: 3 }}>Everyone else got:</p>
-              <p style={{ fontSize: 13, fontStyle: 'italic', color: '#ffffff70' }}>"{state.qPair?.a}"</p>
-              <p style={{ fontSize: 22, fontWeight: 900, marginTop: 16, color: groupWon ? '#30D158' : '#FF2D55' }}>
-                {groupWon ? 'Group wins! 🎊' : 'Imposter escapes! 😂'}
+              {!isReverse && (
+                <>
+                  <p style={{ fontSize: 11, color: T.textDim, marginBottom: 3 }}>Everyone else got:</p>
+                  <p style={{ fontSize: 13, fontStyle: 'italic', color: T.textMid }}>"{state.qPair?.a}"</p>
+                </>
+              )}
+              <p style={{ fontSize: 20, fontWeight: 900, marginTop: 16, color: groupWon ? '#34D399' : '#FF6B6B' }}>
+                {isReverse
+                  ? (groupWon ? 'Pair identified! 🎊' : 'Twins escaped! 😂')
+                  : (groupWon ? 'Group wins! 🎊' : 'Outlier escapes! 😂')}
               </p>
             </div>
           )}
 
-          {/* Stage 2+ — Vote breakdown */}
+          {/* Stage 2+ — vote breakdown */}
           {state.revealStage >= 2 && (
             <div style={{ animation: 'fadeUp .4s ease both' }}>
               <p style={S.lbl}>Who voted for whom</p>
@@ -1241,18 +1105,11 @@ function App() {
                     : impNames.includes(state.votes[player.name]);
                   const col = COLORS[player.colorIdx];
                   return (
-                    <div key={player.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
-                      background:   correct ? '#30D15814' : '#ffffff08',
-                      border:       `1.5px solid ${correct ? '#30D15848' : '#ffffff12'}`,
-                      borderRadius: 12,
-                      animation:    'stagger .35s ease both',
-                      animationDelay: `${i * 55}ms`,
-                    }}>
-                      <div style={{ ...D.avatar(col, 28), fontSize: 11 }}>{player.name[0]?.toUpperCase()}</div>
-                      <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#ffffffcc' }}>{player.name}</span>
-                      <span style={{ fontSize: 12, color: '#ffffff45' }}>→</span>
-                      <span style={{ fontSize: 13, fontWeight: 800, color: correct ? '#30D158' : '#ffffffcc' }}>{vFor}</span>
+                    <div key={player.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: correct ? 'rgba(52,211,153,0.07)' : 'rgba(255,255,255,0.03)', border: `1px solid ${correct ? 'rgba(52,211,153,0.3)' : T.border}`, borderRadius: 12, animation: 'stagger .35s ease both', animationDelay: `${i * 50}ms` }}>
+                      <div style={D.avatar(col, 28)}>{player.name[0]?.toUpperCase()}</div>
+                      <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: T.textMid }}>{player.name}</span>
+                      <span style={{ fontSize: 12, color: T.textDim }}>→</span>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: correct ? '#34D399' : T.textMid }}>{vFor}</span>
                       <span style={{ fontSize: 16 }}>{correct ? '✅' : '❌'}</span>
                     </div>
                   );
@@ -1261,29 +1118,21 @@ function App() {
             </div>
           )}
 
-          {/* Stage 3 — Leaderboard + next button */}
+          {/* Stage 3 — leaderboard + next */}
           {state.revealStage >= 3 && (
             <div style={{ animation: 'fadeUp .4s ease both' }}>
-              <div style={S.hr} />
+              <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)', margin: '20px 0' }} />
               {state.questionsCycled && (
-                <p style={{ color: '#FF9F0A80', fontSize: 11, textAlign: 'center', marginBottom: 12, fontStyle: 'italic' }}>
-                  🔄 All questions used — cycling back through the deck
-                </p>
+                <p style={{ color: 'rgba(255,159,69,0.65)', fontSize: 11, textAlign: 'center', marginBottom: 12, fontStyle: 'italic' }}>🔄 All questions used — cycling back through the deck</p>
               )}
               <p style={{ ...S.lbl, marginBottom: 12 }}>Leaderboard · Round {state.round}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 20 }}>
                 {Object.entries(state.scores).sort((a, b) => b[1] - a[1]).map(([name, pts], i) => {
                   const player = state.players.find(p => p.name === name);
-                  return (
-                    <ScoreRow key={name} name={name} score={pts} rank={i + 1}
-                      roundPts={state.roundPts[name] || 0}
-                      color={COLORS[(player?.colorIdx ?? i) % COLORS.length]}
-                      delay={i * 65}
-                    />
-                  );
+                  return <ScoreRow key={name} name={name} score={pts} rank={i + 1} roundPts={state.roundPts[name] || 0} color={COLORS[(player?.colorIdx ?? i) % COLORS.length]} delay={i * 65} />;
                 })}
               </div>
-              <PBtn col={state.round >= state.totalRounds ? '#30D158' : '#0A84FF'} onClick={handleNextRound}>
+              <PBtn col={state.round >= state.totalRounds ? '#34D399' : '#4DA6FF'} onClick={handleNextRound}>
                 {state.round >= state.totalRounds ? '🏆 Final Results →' : 'Next Round →'}
               </PBtn>
             </div>
@@ -1293,74 +1142,43 @@ function App() {
 
       {/* ════ FINAL ════ */}
       {state.phase === 'final' && (() => {
-        const sorted = Object.entries(state.scores).sort((a, b) => b[1] - a[1]);
-        const winner = sorted[0]?.[0];
+        const sorted  = Object.entries(state.scores).sort((a, b) => b[1] - a[1]);
+        const winner  = sorted[0]?.[0];
         const wPlayer = state.players.find(p => p.name === winner);
-        const wCol   = COLORS[(wPlayer?.colorIdx ?? 0) % COLORS.length];
+        const wCol    = COLORS[(wPlayer?.colorIdx ?? 0) % COLORS.length];
         return (
           <div style={{ ...S.card, animation: 'fadeUp .4s ease both' }}>
-            <div style={{ textAlign: 'center', marginBottom: 22 }}>
-              <div style={{
-                fontSize: 70, display: 'inline-block', marginBottom: 4,
-                filter: 'drop-shadow(0 0 32px #FFD60Aaa)',
-                animation: 'crown 2s ease-in-out infinite',
-              }}>🏆</div>
-              <h1 style={{
-                fontSize: 46, fontWeight: 900, letterSpacing: '-2px',
-                background: 'linear-gradient(135deg, #FFD60A, #FF9F0A, #FF6B35)',
-                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-              }}>Final Results</h1>
-              <p style={{ color: '#ffffff40', fontSize: 11, marginTop: 6, letterSpacing: 3, textTransform: 'uppercase' }}>
-                {state.totalRounds} round{state.totalRounds !== 1 ? 's' : ''} complete
-              </p>
+            <div style={{ textAlign: 'center', marginBottom: 24 }}>
+              <div style={{ fontSize: 66, display: 'inline-block', marginBottom: 4, filter: 'drop-shadow(0 0 28px rgba(255,203,71,0.6))', animation: 'crown 2.2s ease-in-out infinite' }}>🏆</div>
+              <h1 className="title-gradient" style={{ fontSize: 44, fontWeight: 900, letterSpacing: '-2px', margin: 0 }}>Final Results</h1>
+              <p style={{ color: T.textDim, fontSize: 10, marginTop: 6, letterSpacing: 3, textTransform: 'uppercase' }}>{state.totalRounds} round{state.totalRounds !== 1 ? 's' : ''} complete</p>
             </div>
 
-            {/* Winner callout */}
-            <div style={{
-              background: `linear-gradient(135deg, ${wCol}28, ${wCol}10)`,
-              border: `2px solid ${wCol}`, borderRadius: 22, padding: '22px',
-              textAlign: 'center', marginBottom: 18,
-              boxShadow: `0 0 55px ${wCol}48`, animation: 'popIn .5s ease both',
-            }}>
-              <p style={{ fontSize: 10, letterSpacing: 4, textTransform: 'uppercase', color: wCol + '88', fontWeight: 800, marginBottom: 8 }}>Winner</p>
-              <div style={{
-                width: 62, height: 62, borderRadius: '50%', margin: '0 auto 10px',
-                background: wCol + '30', border: `3px solid ${wCol}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 26, fontWeight: 900, color: wCol, boxShadow: `0 0 28px ${wCol}70`,
-              }}>{winner?.[0]?.toUpperCase()}</div>
-              <h2 style={{ fontSize: 36, fontWeight: 900, letterSpacing: '-1px' }}>{winner} 👑</h2>
-              <p style={{ fontSize: 28, fontWeight: 900, color: wCol, marginTop: 6 }}>
-                {sorted[0]?.[1]} pt{sorted[0]?.[1] !== 1 ? 's' : ''}
-              </p>
+            <div style={{ background: `${wCol}14`, border: `1.5px solid ${wCol}55`, borderRadius: T.rx, padding: '22px', textAlign: 'center', marginBottom: 20, boxShadow: `0 0 0 1px ${wCol}20, 0 8px 40px ${wCol}30`, animation: 'popIn .5s ease both' }}>
+              <p style={{ fontSize: 10, letterSpacing: 3.5, textTransform: 'uppercase', color: wCol + '80', fontWeight: 700, marginBottom: 8 }}>Winner</p>
+              <div style={{ width: 60, height: 60, borderRadius: '50%', margin: '0 auto 10px', background: wCol + '25', border: `2px solid ${wCol}70`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 900, color: wCol }}>{winner?.[0]?.toUpperCase()}</div>
+              <h2 style={{ fontSize: 34, fontWeight: 900, letterSpacing: '-1px' }}>{winner} 👑</h2>
+              <p style={{ fontSize: 26, fontWeight: 900, color: wCol, marginTop: 4 }}>{sorted[0]?.[1]} pt{sorted[0]?.[1] !== 1 ? 's' : ''}</p>
             </div>
 
             <p style={S.lbl}>Full Standings</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 22 }}>
               {sorted.map(([name, pts], i) => {
                 const player = state.players.find(p => p.name === name);
-                return (
-                  <ScoreRow key={name} name={name} score={pts} rank={i + 1}
-                    roundPts={0}
-                    color={COLORS[(player?.colorIdx ?? i) % COLORS.length]}
-                    delay={i * 80}
-                  />
-                );
+                return <ScoreRow key={name} name={name} score={pts} rank={i + 1} roundPts={0} color={COLORS[(player?.colorIdx ?? i) % COLORS.length]} delay={i * 80} />;
               })}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
               <button onClick={handleBeginGame} style={D.btn('grad')}>Play Again (Same Players) →</button>
-              <button onClick={() => { SoundEngine.click(); dispatch({ type: 'RESET_TO_SETUP' }); }} style={S.ghostBtn}>
-                Change Settings
-              </button>
+              <button onClick={() => { SoundEngine.click(); dispatch({ type: 'RESET_TO_SETUP' }); }} style={{ display: 'block', width: '100%', padding: '12px', borderRadius: 14, border: `1px solid ${T.border}`, background: 'transparent', color: T.textMid, fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>Change Settings</button>
             </div>
           </div>
         );
       })()}
+
     </div>
   );
 }
 
-/* ── Mount ── */
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
