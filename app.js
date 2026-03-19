@@ -40,12 +40,12 @@ const MODIFIERS = [
 ];
 
 const QUESTION_PACKS = [
-  { id: 'main',         label: 'Classic',       emoji: '🎲', file: 'questions/main.json',          desc: 'Everyday questions about you' },
-  { id: 'players',      label: 'About Us',      emoji: '👥', file: 'questions/players.json',        desc: 'Questions featuring a player in the room', hasPlayer: true },
-  { id: 'hypothetical', label: 'Hypothetical',  emoji: '🤔', file: 'questions/hypothetical.json',   desc: 'What would you do if…' },
-  { id: 'deep',         label: 'Deep Cuts',     emoji: '💭', file: 'questions/deep.json',            desc: 'Meaningful & introspective' },
-  { id: 'spicy',        label: 'Spicy',         emoji: '🌶️', file: 'questions/spicy.json',          desc: 'Controversial opinions & hot takes' },
-  { id: 'nostalgia',    label: 'Nostalgia',     emoji: '📼', file: 'questions/nostalgia.json',       desc: 'Childhood memories & throwbacks' },
+  { id: 'main',         label: 'Classic',       emoji: '🎲', file: 'questions/Main.json',          desc: 'Everyday questions about you' },
+  { id: 'players',      label: 'About Us',      emoji: '👥', file: 'questions/Players.json',        desc: 'Questions featuring a player in the room', hasPlayer: true },
+  { id: 'hypothetical', label: 'Hypothetical',  emoji: '🤔', file: 'questions/Hypothetical.json',   desc: 'What would you do if…' },
+  { id: 'deep',         label: 'Deep Cuts',     emoji: '💭', file: 'questions/Deep.json',            desc: 'Meaningful & introspective' },
+  { id: 'spicy',        label: 'Spicy',         emoji: '🌶️', file: 'questions/Spicy.json',          desc: 'Unpopular opinions & hot takes — nothing NSFW', notice: 'Not NSFW — just unpopular opinions & takes people might disagree with.' },
+  { id: 'nostalgia',    label: 'Nostalgia',     emoji: '📼', file: 'questions/Nostalgia.json',       desc: 'Childhood memories & throwbacks' },
 ];
 
 /* ──────────────────────────────────────
@@ -542,7 +542,7 @@ function App() {
       .filter(p => activePacks.includes(p.id))
       .map(p => fetch(p.file).then(r => r.ok ? r.json() : []).catch(() => []));
 
-    const reversePromise = fetch('questions/reverse.json')
+    const reversePromise = fetch('questions/Reverse.json')
       .then(r => r.ok ? r.json() : [])
       .catch(() => []);
 
@@ -861,14 +861,21 @@ function App() {
               const active = activePacks.includes(pack.id);
               const isOnlyOne = activePacks.length === 1 && active;
               return (
-                <button key={pack.id} onClick={() => { if (!isOnlyOne) togglePack(pack.id); }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderRadius: T.r, border: `1px solid ${active ? 'rgba(77,166,255,0.35)' : T.border}`, background: active ? 'rgba(77,166,255,0.08)' : T.surface, textAlign: 'left', width: '100%', fontFamily: 'inherit', cursor: isOnlyOne ? 'default' : 'pointer', opacity: isOnlyOne ? 0.7 : 1, transition: 'all .18s' }}>
-                  <span style={{ fontSize: 22, flexShrink: 0 }}>{pack.emoji}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: active ? '#4DA6FF' : T.text, marginBottom: 2 }}>{pack.label}</div>
-                    <div style={{ fontSize: 11, color: T.textDim }}>{pack.desc}</div>
-                  </div>
-                  <div style={{ width: 20, height: 20, borderRadius: '50%', flexShrink: 0, background: active ? '#4DA6FF' : 'rgba(255,255,255,0.07)', border: `1.5px solid ${active ? '#4DA6FF' : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, color: '#fff', transition: 'all .18s' }}>{active ? '✓' : ''}</div>
-                </button>
+                <React.Fragment key={pack.id}>
+                  <button onClick={() => { if (!isOnlyOne) togglePack(pack.id); }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderRadius: pack.notice && active ? `${T.r}px ${T.r}px 0 0` : T.r, border: `1px solid ${active ? 'rgba(77,166,255,0.35)' : T.border}`, borderBottom: pack.notice && active ? 'none' : undefined, background: active ? 'rgba(77,166,255,0.08)' : T.surface, textAlign: 'left', width: '100%', fontFamily: 'inherit', cursor: isOnlyOne ? 'default' : 'pointer', opacity: isOnlyOne ? 0.7 : 1, transition: 'all .18s' }}>
+                    <span style={{ fontSize: 22, flexShrink: 0 }}>{pack.emoji}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: active ? '#4DA6FF' : T.text, marginBottom: 2 }}>{pack.label}</div>
+                      <div style={{ fontSize: 11, color: T.textDim }}>{pack.desc}</div>
+                    </div>
+                    <div style={{ width: 20, height: 20, borderRadius: '50%', flexShrink: 0, background: active ? '#4DA6FF' : 'rgba(255,255,255,0.07)', border: `1.5px solid ${active ? '#4DA6FF' : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, color: '#fff', transition: 'all .18s' }}>{active ? '✓' : ''}</div>
+                  </button>
+                  {pack.notice && active && (
+                    <div style={{ padding: '7px 13px', borderRadius: `0 0 ${T.r}px ${T.r}px`, background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(77,166,255,0.35)', borderTop: 'none', fontSize: 11, color: 'rgba(251,191,36,0.8)', fontWeight: 600, lineHeight: 1.45 }}>
+                      ⚠️ {pack.notice}
+                    </div>
+                  )}
+                </React.Fragment>
               );
             })}
             {state.mode === 'reverse' && (
