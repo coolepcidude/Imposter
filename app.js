@@ -40,14 +40,15 @@ const MODIFIERS = [
 ];
 
 const QUESTION_PACKS = [
-  { id: 'main',         label: 'Classic',       emoji: '🎲', file: 'questions/Main.JSON',          desc: 'Everyday questions about you' },
-  { id: 'players',      label: 'About Us',      emoji: '👥', file: 'questions/Players.JSON',        desc: 'Questions featuring a player in the room', hasPlayer: true },
-  { id: 'hypothetical', label: 'Hypothetical',  emoji: '🤔', file: 'questions/Hypothetical.JSON',   desc: 'What would you do if…' },
-  { id: 'deep',         label: 'Deep Cuts',     emoji: '💭', file: 'questions/Deep.JSON',            desc: 'Meaningful & introspective' },
-  { id: 'spicy',        label: 'Spicy',         emoji: '🌶️', file: 'questions/Spicy.JSON',          desc: 'Unpopular opinions & hot takes — nothing NSFW', notice: 'Not NSFW — just unpopular opinions & takes people might disagree with.' },
-  { id: 'nostalgia',    label: 'Nostalgia',     emoji: '📼', file: 'questions/Nostalgia.JSON',       desc: 'Childhood memories & throwbacks' },
-  { id: 'numbers',      label: 'Numbers',       emoji: '🔢', file: 'questions/Numbers.JSON',         desc: 'All answers are numbers' },
-  { id: 'sentences',    label: 'Sentences',     emoji: '✏️', file: 'questions/Sentences.JSON',       desc: 'Complete the sentence' },
+  { id: 'main',         label: 'Classic',      emoji: '🎲', file: 'questions/Main.JSON',         desc: 'Everyday questions about you' },
+  { id: 'players',      label: 'About Us',     emoji: '👥', file: 'questions/Players.JSON',       desc: 'Questions featuring a player in the room', hasPlayer: true },
+  { id: 'hypothetical', label: 'Hypothetical', emoji: '🤔', file: 'questions/Hypothetical.JSON',  desc: 'What would you do if…' },
+  { id: 'deep',         label: 'Deep Cuts',    emoji: '💭', file: 'questions/Deep.JSON',           desc: 'Meaningful & introspective' },
+  { id: 'spicy',        label: 'Spicy',        emoji: '🌶️', file: 'questions/Spicy.JSON',         desc: 'Unpopular opinions & hot takes', notice: 'Not NSFW — just unpopular opinions & takes people might disagree with.' },
+  { id: 'nostalgia',    label: 'Nostalgia',    emoji: '📼', file: 'questions/Nostalgia.JSON',      desc: 'Childhood memories & throwbacks' },
+  { id: 'numbers',      label: 'Numbers',      emoji: '🔢', file: 'questions/Numbers.JSON',        desc: 'All answers are numbers' },
+  { id: 'sentences',    label: 'Sentences',    emoji: '✏️', file: 'questions/Sentences.JSON',      desc: 'Complete the sentence' },
+  { id: 'reverse',      label: 'Reverse',      emoji: '🔄', file: 'questions/Reverse.JSON',        desc: 'Curated for Reverse mode — variants feel similar' },
 ];
 
 const ANSWER_CHAR_LIMIT = 80;
@@ -60,7 +61,7 @@ function haptic(pattern) {
 }
 
 /* ──────────────────────────────────────
-   CANVAS HELPERS  (for round summary card)
+   CANVAS HELPERS  (round summary card)
 ────────────────────────────────────── */
 function ctxWrapText(ctx, text, x, y, maxWidth, lineHeight) {
   const words = text.split(' ');
@@ -109,9 +110,9 @@ const INITIAL_STATE = {
   ],
   nameError: '',
 
-  round:          1,
-  scores:         {},
-  usedIdx:        [],
+  round:           1,
+  scores:          {},
+  usedIdx:         [],
   questionsCycled: false,
 
   qOrder:         [],
@@ -123,9 +124,9 @@ const INITIAL_STATE = {
   playerVariants: null,
   playerSubject:  null,
 
-  voteOrder:  [],
-  curVoter:   0,
-  votes:      {},
+  voteOrder: [],
+  curVoter:  0,
+  votes:     {},
 
   roundPts:    {},
   confetti:    false,
@@ -139,10 +140,10 @@ const INITIAL_STATE = {
 function reducer(state, action) {
   switch (action.type) {
 
-    case 'SET_MODE':         return { ...state, mode: action.mode };
-    case 'SET_ROUNDS':       return { ...state, totalRounds: action.rounds };
-    case 'TOGGLE_TIMER':     return { ...state, timerEnabled: !state.timerEnabled };
-    case 'SET_TIMER_SECONDS':return { ...state, timerSeconds: action.seconds };
+    case 'SET_MODE':          return { ...state, mode: action.mode };
+    case 'SET_ROUNDS':        return { ...state, totalRounds: action.rounds };
+    case 'TOGGLE_TIMER':      return { ...state, timerEnabled: !state.timerEnabled };
+    case 'SET_TIMER_SECONDS': return { ...state, timerSeconds: action.seconds };
 
     case 'ADD_PLAYER': {
       if (state.players.length >= 10) return state;
@@ -188,11 +189,8 @@ function reducer(state, action) {
       };
     }
 
-    case 'SET_PHASE':
-      return { ...state, phase: action.phase };
-
-    case 'SET_WRITING':
-      return { ...state, writing: action.value };
+    case 'SET_PHASE':    return { ...state, phase: action.phase };
+    case 'SET_WRITING':  return { ...state, writing: action.value };
 
     case 'SUBMIT_ANSWER': {
       const playerIdx  = state.qOrder[state.curAns];
@@ -236,11 +234,8 @@ function reducer(state, action) {
       return { ...state, roundPts: earned, scores: newScores, groupWon: won, phase: 'reveal', revealStage: 0 };
     }
 
-    case 'SET_REVEAL_STAGE':
-      return { ...state, revealStage: action.stage };
-
-    case 'SET_CONFETTI':
-      return { ...state, confetti: action.value };
+    case 'SET_REVEAL_STAGE': return { ...state, revealStage: action.stage };
+    case 'SET_CONFETTI':     return { ...state, confetti: action.value };
 
     case 'NEXT_ROUND': {
       const { roundData, newRound } = action;
@@ -284,13 +279,13 @@ function reducer(state, action) {
    STYLE TOKENS
 ────────────────────────────────────── */
 const T = {
-  bg:        '#070810',
-  surface:   'rgba(255,255,255,0.03)',
-  border:    'rgba(255,255,255,0.07)',
-  borderHi:  'rgba(255,255,255,0.14)',
-  text:      '#F0F4FF',
-  textMid:   'rgba(240,244,255,0.55)',
-  textDim:   'rgba(240,244,255,0.28)',
+  bg:       '#070810',
+  surface:  'rgba(255,255,255,0.03)',
+  border:   'rgba(255,255,255,0.07)',
+  borderHi: 'rgba(255,255,255,0.14)',
+  text:     '#F0F4FF',
+  textMid:  'rgba(240,244,255,0.55)',
+  textDim:  'rgba(240,244,255,0.28)',
   r:  16,
   rl: 22,
   rx: 28,
@@ -308,7 +303,7 @@ const S = {
     position:       'relative',
     overflow:       'hidden',
   },
-  card:  { width: '100%', maxWidth: 468 },
+  card: { width: '100%', maxWidth: 468 },
   lbl: {
     color:         T.textDim,
     fontSize:      10,
@@ -330,78 +325,69 @@ const S = {
     fontFamily:   'inherit',
     transition:   'border-color .18s, box-shadow .18s',
   },
-  glass: (accent) => ({
-    background:          accent ? `${accent}08` : T.surface,
-    border:              `1px solid ${accent ? accent + '25' : T.border}`,
-    borderRadius:        T.rl,
-    padding:             '18px',
-    backdropFilter:      'blur(16px)',
-    WebkitBackdropFilter:'blur(16px)',
-  }),
 };
 
 const D = {
   btn: (col, ghost = false, sm = false, dis = false) => ({
-    display:      'block',
-    width:        '100%',
-    padding:      sm ? '11px 16px' : '15px 20px',
-    borderRadius: sm ? 13 : 16,
-    border:       ghost ? `1.5px solid ${col}50` : 'none',
-    background:   ghost      ? 'transparent'
-                : col === 'grad'
-                    ? 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)'
-                    : `linear-gradient(135deg, ${col} 0%, ${col}cc 100%)`,
-    color:        ghost ? col : '#fff',
-    fontSize:     sm ? 13 : 15,
-    fontWeight:   800,
+    display:       'block',
+    width:         '100%',
+    padding:       sm ? '11px 16px' : '15px 20px',
+    borderRadius:  sm ? 13 : 16,
+    border:        ghost ? `1.5px solid ${col}50` : 'none',
+    background:    ghost      ? 'transparent'
+                 : col === 'grad'
+                     ? 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)'
+                     : `linear-gradient(135deg, ${col} 0%, ${col}cc 100%)`,
+    color:         ghost ? col : '#fff',
+    fontSize:      sm ? 13 : 15,
+    fontWeight:    800,
     letterSpacing: 0.3,
-    textShadow:   ghost ? 'none' : '0 1px 6px rgba(0,0,0,.4)',
-    boxShadow:    dis || ghost ? 'none'
-                : col === 'grad' ? '0 4px 22px rgba(99,102,241,.45)'
-                : `0 4px 22px ${col}44`,
-    opacity:      dis ? 0.28 : 1,
-    cursor:       dis ? 'not-allowed' : 'pointer',
-    transition:   'opacity .15s, transform .12s, box-shadow .2s',
-    fontFamily:   'inherit',
+    textShadow:    ghost ? 'none' : '0 1px 6px rgba(0,0,0,.4)',
+    boxShadow:     dis || ghost ? 'none'
+                 : col === 'grad' ? '0 4px 22px rgba(99,102,241,.45)'
+                 : `0 4px 22px ${col}44`,
+    opacity:       dis ? 0.28 : 1,
+    cursor:        dis ? 'not-allowed' : 'pointer',
+    transition:    'opacity .15s, transform .12s, box-shadow .2s',
+    fontFamily:    'inherit',
   }),
 
   avatar: (color, size = 36) => ({
-    width:           size,
-    height:          size,
-    borderRadius:    '50%',
-    flexShrink:      0,
-    background:      color + '18',
-    border:          `1.5px solid ${color}55`,
-    display:         'flex',
-    alignItems:      'center',
-    justifyContent:  'center',
-    fontSize:        Math.floor(size * 0.38),
-    fontWeight:      800,
+    width:          size,
+    height:         size,
+    borderRadius:   '50%',
+    flexShrink:     0,
+    background:     color + '18',
+    border:         `1.5px solid ${color}55`,
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'center',
+    fontSize:       Math.floor(size * 0.38),
+    fontWeight:     800,
     color,
   }),
 
   modePill: (color, selected) => ({
-    display:    'flex',
-    alignItems: 'center',
-    gap:        14,
-    padding:    '14px 16px',
+    display:      'flex',
+    alignItems:   'center',
+    gap:          14,
+    padding:      '14px 16px',
     borderRadius: T.rl,
-    border:     `1px solid ${selected ? color + '55' : T.border}`,
-    background: selected ? color + '12' : T.surface,
-    boxShadow:  selected ? `0 0 0 1px ${color}28, 0 6px 24px ${color}18` : 'none',
-    transition: 'all .2s',
-    textAlign:  'left',
-    width:      '100%',
-    fontFamily: 'inherit',
-    cursor:     'pointer',
+    border:       `1px solid ${selected ? color + '55' : T.border}`,
+    background:   selected ? color + '12' : T.surface,
+    boxShadow:    selected ? `0 0 0 1px ${color}28, 0 6px 24px ${color}18` : 'none',
+    transition:   'all .2s',
+    textAlign:    'left',
+    width:        '100%',
+    fontFamily:   'inherit',
+    cursor:       'pointer',
   }),
 };
 
 /* ──────────────────────────────────────
-   MEMOISED COMPONENTS
+   COMPONENTS
 ────────────────────────────────────── */
 
-/* Confetti canvas */
 const Confetti = memo(function Confetti({ active }) {
   const ref = useRef();
   const raf = useRef();
@@ -440,56 +426,36 @@ const Confetti = memo(function Confetti({ active }) {
   return <canvas ref={ref} style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 9999 }} />;
 });
 
-/* Animated gradient blobs */
 const BlobBG = memo(function BlobBG({ accent = '#6366F1' }) {
   return (
     <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
       <div style={{ position: 'absolute', top: '-25%', left: '-10%', width: '65vw', height: '65vw', borderRadius: '50%', background: `radial-gradient(circle, ${accent}18 0%, transparent 68%)`, animation: 'drift1 14s ease-in-out infinite', transition: 'background 1.4s' }} />
-      <div style={{ position: 'absolute', bottom: '-20%', right: '-8%',  width: '55vw', height: '55vw', borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 68%)',  animation: 'drift2 18s ease-in-out infinite' }} />
-      <div style={{ position: 'absolute', top: '45%',   right: '5%',     width: '40vw', height: '40vw', borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 68%)',   animation: 'drift3 12s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', bottom: '-20%', right: '-8%', width: '55vw', height: '55vw', borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 68%)', animation: 'drift2 18s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', top: '45%', right: '5%', width: '40vw', height: '40vw', borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 68%)', animation: 'drift3 12s ease-in-out infinite' }} />
       <div style={{ position: 'absolute', inset: 0, opacity: 0.018, backgroundImage: 'linear-gradient(rgba(255,255,255,.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.6) 1px, transparent 1px)', backgroundSize: '44px 44px' }} />
     </div>
   );
 });
 
-/* Segmented progress bar */
 const PBar = memo(function PBar({ total, current, accent }) {
   return (
     <div style={{ display: 'flex', gap: 5, justifyContent: 'center', marginBottom: 20 }}>
       {Array.from({ length: total }).map((_, i) => (
-        <div key={i} style={{
-          height: 4, flex: 1, maxWidth: 28, borderRadius: 99,
-          background:  i < current ? 'rgba(255,255,255,0.55)' : i === current ? accent : 'rgba(255,255,255,0.1)',
-          boxShadow:   i === current ? `0 0 8px ${accent}` : 'none',
-          transition: 'all .35s',
-        }} />
+        <div key={i} style={{ height: 4, flex: 1, maxWidth: 28, borderRadius: 99, background: i < current ? 'rgba(255,255,255,0.55)' : i === current ? accent : 'rgba(255,255,255,0.1)', boxShadow: i === current ? `0 0 8px ${accent}` : 'none', transition: 'all .35s' }} />
       ))}
     </div>
   );
 });
 
-/* Leaderboard row */
 const ScoreRow = memo(function ScoreRow({ name, score, roundPts, rank, color, delay = 0 }) {
   const medals = ['🥇', '🥈', '🥉'];
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px',
-      background:   rank === 1 ? `${color}14` : 'rgba(255,255,255,0.04)',
-      border:       `1px solid ${rank === 1 ? color + '55' : T.border}`,
-      borderRadius: T.r,
-      boxShadow:    rank === 1 ? `0 0 0 1px ${color}22, 0 6px 24px ${color}28` : 'none',
-      animation:    'stagger .4s ease both',
-      animationDelay: `${delay}ms`,
-    }}>
-      <span style={{ fontSize: 20, width: 28, textAlign: 'center', flexShrink: 0 }}>
-        {rank <= 3 ? medals[rank - 1] : rank}
-      </span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px', background: rank === 1 ? `${color}14` : 'rgba(255,255,255,0.04)', border: `1px solid ${rank === 1 ? color + '55' : T.border}`, borderRadius: T.r, boxShadow: rank === 1 ? `0 0 0 1px ${color}22, 0 6px 24px ${color}28` : 'none', animation: 'stagger .4s ease both', animationDelay: `${delay}ms` }}>
+      <span style={{ fontSize: 20, width: 28, textAlign: 'center', flexShrink: 0 }}>{rank <= 3 ? medals[rank - 1] : rank}</span>
       <div style={D.avatar(color)}>{name[0]?.toUpperCase()}</div>
       <span style={{ flex: 1, fontWeight: 700, fontSize: 15, color: rank === 1 ? T.text : T.textMid }}>{name}</span>
       {roundPts > 0 && (
-        <span style={{ fontSize: 11, fontWeight: 800, color: '#34D399', background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.28)', borderRadius: 8, padding: '3px 9px', animation: 'popIn .3s ease both', animationDelay: `${delay + 180}ms` }}>
-          +{roundPts}
-        </span>
+        <span style={{ fontSize: 11, fontWeight: 800, color: '#34D399', background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.28)', borderRadius: 8, padding: '3px 9px', animation: 'popIn .3s ease both', animationDelay: `${delay + 180}ms` }}>+{roundPts}</span>
       )}
       <span style={{ fontSize: 22, fontWeight: 900, color: rank === 1 ? color : T.textMid }}>{score}</span>
       <span style={{ fontSize: 10, color: T.textDim, marginLeft: 2 }}>pts</span>
@@ -497,7 +463,6 @@ const ScoreRow = memo(function ScoreRow({ name, score, roundPts, rank, color, de
   );
 });
 
-/* Lock / handoff screen */
 const LockScreen = memo(function LockScreen({ name, color, sub, btnLabel, onReady }) {
   return (
     <div style={{ maxWidth: 440, width: '100%', textAlign: 'center', animation: 'fadeUp .32s ease both' }}>
@@ -510,7 +475,6 @@ const LockScreen = memo(function LockScreen({ name, color, sub, btnLabel, onRead
   );
 });
 
-/* Timer bar */
 const TimerBar = memo(function TimerBar({ timeLeft, total, accent }) {
   const pct       = (timeLeft / total) * 100;
   const isWarning = timeLeft <= 5;
@@ -529,12 +493,10 @@ const TimerBar = memo(function TimerBar({ timeLeft, total, accent }) {
   );
 });
 
-/* Generic full-width button */
 const PBtn = memo(function PBtn({ col, ghost, sm, dis, onClick, children }) {
   return <button onClick={onClick} disabled={dis} style={D.btn(col, ghost, sm, dis)}>{children}</button>;
 });
 
-/* Modifier pill banner */
 const ModifierBanner = memo(function ModifierBanner({ modifiers }) {
   if (!modifiers || modifiers.length === 0) return null;
   return (
@@ -552,203 +514,117 @@ const ModifierBanner = memo(function ModifierBanner({ modifiers }) {
   );
 });
 
-/* ── Round Summary Card ─────────────────────────────── */
-const RoundSummaryCard = memo(function RoundSummaryCard({
-  round, totalRounds, groupWon, impNames, qPair, answers, players, mode,
-}) {
+/* ── Round Summary Card ── */
+const RoundSummaryCard = memo(function RoundSummaryCard({ round, totalRounds, groupWon, impNames, qPair, answers, players, mode }) {
   const canvasRef = useRef(null);
   const isReverse = mode === 'reverse';
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !qPair) return;
-
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const W   = 600;
     const PAD = 30;
-
-    // Estimate height: header + outlier section + group section + answers + footer
     const answerRows = Math.ceil(players.length / 2);
     const H = Math.max(460, 310 + impNames.length * 44 + answerRows * 30 + 50);
-
     canvas.width        = W * dpr;
     canvas.height       = H * dpr;
     canvas.style.width  = W + 'px';
     canvas.style.height = H + 'px';
-
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
-
     const impColor = groupWon ? '#34D399' : '#FF6B6B';
     const ACCENT   = '#818CF8';
     const TEXT     = '#F0F4FF';
     const MID      = 'rgba(240,244,255,0.55)';
     const DIM      = 'rgba(240,244,255,0.28)';
-
-    // Background
     ctx.fillStyle = '#0B0D1B';
     ctx.fillRect(0, 0, W, H);
-
-    // Ambient glow
     const grd = ctx.createRadialGradient(W * 0.18, H * 0.22, 0, W * 0.18, H * 0.22, W * 0.65);
     grd.addColorStop(0, 'rgba(99,102,241,0.13)');
     grd.addColorStop(1, 'transparent');
     ctx.fillStyle = grd;
     ctx.fillRect(0, 0, W, H);
-
-    // Card border
     ctx.strokeStyle = 'rgba(255,255,255,0.08)';
     ctx.lineWidth   = 1;
-    ctxRoundRect(ctx, 0.5, 0.5, W - 1, H - 1, 18);
-    ctx.stroke();
-
+    ctxRoundRect(ctx, 0.5, 0.5, W - 1, H - 1, 18); ctx.stroke();
     let y = PAD + 14;
-
-    // ── Header ─────────────────────────────────────
-    ctx.font      = '800 20px system-ui, -apple-system, sans-serif';
+    ctx.font = '800 20px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = ACCENT;
     ctx.fillText('OUTLIER', PAD, y);
-
     const roundStr = `Round ${round} of ${totalRounds}`;
-    ctx.font      = '700 11px system-ui, -apple-system, sans-serif';
+    ctx.font = '700 11px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = DIM;
     ctx.fillText(roundStr, W - PAD - ctx.measureText(roundStr).width, y);
-
     const modeNames = { clueless: 'Clueless', undercover: 'Undercover', doublecross: 'Double Cross', reverse: 'Reverse' };
-    ctx.font      = '600 10px system-ui, -apple-system, sans-serif';
+    ctx.font = '600 10px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = 'rgba(240,244,255,0.2)';
     ctx.fillText(modeNames[mode] || mode, PAD, y + 17);
-
     y += 38;
-
-    // Divider
-    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
-    ctx.lineWidth   = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(PAD, y); ctx.lineTo(W - PAD, y); ctx.stroke();
     y += 18;
-
-    // ── Outlier section ────────────────────────────
-    ctx.font      = '700 9px system-ui, -apple-system, sans-serif';
+    ctx.font = '700 9px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = DIM;
     ctx.fillText(isReverse ? 'THE MATCHING PAIR' : impNames.length > 1 ? 'THE OUTLIERS' : 'THE OUTLIER', PAD, y);
     y += 20;
-
-    // Name
-    ctx.font      = '800 24px system-ui, -apple-system, sans-serif';
+    ctx.font = '800 24px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = impColor;
     ctx.fillText(impNames.join(' & '), PAD, y);
-
-    // Outcome badge (right-aligned)
-    const outLabel = isReverse
-      ? (groupWon ? 'IDENTIFIED' : 'ESCAPED')
-      : (groupWon ? 'CAUGHT' : 'ESCAPED');
+    const outLabel = isReverse ? (groupWon ? 'IDENTIFIED' : 'ESCAPED') : (groupWon ? 'CAUGHT' : 'ESCAPED');
     ctx.font = '800 10px system-ui, -apple-system, sans-serif';
-    const bW = ctx.measureText(outLabel).width + 18;
-    const bH = 22;
-    const bX = W - PAD - bW;
-    const bY = y - 18;
-    ctx.fillStyle   = groupWon ? 'rgba(52,211,153,0.14)' : 'rgba(255,107,107,0.14)';
+    const bW = ctx.measureText(outLabel).width + 18, bH = 22, bX = W - PAD - bW, bY = y - 18;
+    ctx.fillStyle = groupWon ? 'rgba(52,211,153,0.14)' : 'rgba(255,107,107,0.14)';
     ctxRoundRect(ctx, bX, bY, bW, bH, 6); ctx.fill();
-    ctx.strokeStyle = groupWon ? 'rgba(52,211,153,0.45)' : 'rgba(255,107,107,0.45)';
-    ctx.lineWidth   = 1;
+    ctx.strokeStyle = groupWon ? 'rgba(52,211,153,0.45)' : 'rgba(255,107,107,0.45)'; ctx.lineWidth = 1;
     ctxRoundRect(ctx, bX, bY, bW, bH, 6); ctx.stroke();
-    ctx.fillStyle   = impColor;
-    ctx.fillText(outLabel, bX + 9, bY + 15);
-
+    ctx.fillStyle = impColor; ctx.fillText(outLabel, bX + 9, bY + 15);
     y += 14;
-
-    // Their question
-    ctx.font      = '600 9px system-ui, -apple-system, sans-serif';
-    ctx.fillStyle = DIM;
-    ctx.fillText('THEIR QUESTION', PAD, y);
-    y += 16;
-
-    ctx.font      = 'italic 12px system-ui, -apple-system, sans-serif';
-    ctx.fillStyle = MID;
-    y = ctxWrapText(ctx, `"${qPair.b}"`, PAD + 4, y, W - PAD * 2 - 8, 18);
-    y += 4;
-
-    // Their answers
+    ctx.font = '600 9px system-ui, -apple-system, sans-serif'; ctx.fillStyle = DIM;
+    ctx.fillText('THEIR QUESTION', PAD, y); y += 16;
+    ctx.font = 'italic 12px system-ui, -apple-system, sans-serif'; ctx.fillStyle = MID;
+    y = ctxWrapText(ctx, `"${qPair.b}"`, PAD + 4, y, W - PAD * 2 - 8, 18); y += 4;
     impNames.forEach(name => {
       const ans = answers[name];
       if (!ans || ans === '…') return;
-      ctx.font      = '700 9px system-ui, -apple-system, sans-serif';
-      ctx.fillStyle = DIM;
-      ctx.fillText(`${name.toUpperCase()}'S ANSWER`, PAD, y);
-      y += 16;
-      ctx.font      = '700 13px system-ui, -apple-system, sans-serif';
-      ctx.fillStyle = impColor;
-      const shortAns = ans.length > 60 ? ans.slice(0, 60) + '…' : ans;
-      y = ctxWrapText(ctx, `"${shortAns}"`, PAD + 4, y, W - PAD * 2 - 8, 18);
-      y += 6;
+      ctx.font = '700 9px system-ui, -apple-system, sans-serif'; ctx.fillStyle = DIM;
+      ctx.fillText(`${name.toUpperCase()}'S ANSWER`, PAD, y); y += 16;
+      ctx.font = '700 13px system-ui, -apple-system, sans-serif'; ctx.fillStyle = impColor;
+      y = ctxWrapText(ctx, `"${ans.length > 60 ? ans.slice(0, 60) + '…' : ans}"`, PAD + 4, y, W - PAD * 2 - 8, 18); y += 6;
     });
-
     y += 4;
-
-    // Divider
-    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
-    ctx.lineWidth   = 1;
-    ctx.beginPath(); ctx.moveTo(PAD, y); ctx.lineTo(W - PAD, y); ctx.stroke();
-    y += 16;
-
-    // ── Group question ─────────────────────────────
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD, y); ctx.lineTo(W - PAD, y); ctx.stroke(); y += 16;
     if (!isReverse) {
-      ctx.font      = '700 9px system-ui, -apple-system, sans-serif';
-      ctx.fillStyle = DIM;
-      ctx.fillText('EVERYONE ELSE GOT', PAD, y);
-      y += 16;
-
-      ctx.font      = 'italic 12px system-ui, -apple-system, sans-serif';
-      ctx.fillStyle = MID;
-      y = ctxWrapText(ctx, `"${qPair.a}"`, PAD + 4, y, W - PAD * 2 - 8, 18);
-      y += 10;
+      ctx.font = '700 9px system-ui, -apple-system, sans-serif'; ctx.fillStyle = DIM;
+      ctx.fillText('EVERYONE ELSE GOT', PAD, y); y += 16;
+      ctx.font = 'italic 12px system-ui, -apple-system, sans-serif'; ctx.fillStyle = MID;
+      y = ctxWrapText(ctx, `"${qPair.a}"`, PAD + 4, y, W - PAD * 2 - 8, 18); y += 10;
     }
-
-    // ── All answers grid ───────────────────────────
-    ctx.font      = '700 9px system-ui, -apple-system, sans-serif';
-    ctx.fillStyle = DIM;
-    ctx.fillText('ALL ANSWERS', PAD, y);
-    y += 14;
-
-    const col1X = PAD;
-    const col2X = W / 2 + 6;
-    let   col   = 0;
-    let   baseY = y;
-
-    players.forEach((p) => {
+    ctx.font = '700 9px system-ui, -apple-system, sans-serif'; ctx.fillStyle = DIM;
+    ctx.fillText('ALL ANSWERS', PAD, y); y += 14;
+    const col1X = PAD, col2X = W / 2 + 6;
+    let col = 0, baseY = y;
+    players.forEach(p => {
       const isImp = impNames.includes(p.name);
       const ans   = answers[p.name] || '…';
       const xPos  = col % 2 === 0 ? col1X : col2X;
       const rowY  = baseY + Math.floor(col / 2) * 30;
-      const dotColor = isImp ? impColor : (COLORS[p.colorIdx % COLORS.length]);
-
-      // Dot
-      ctx.beginPath();
-      ctx.arc(xPos + 5, rowY - 3, 4, 0, Math.PI * 2);
-      ctx.fillStyle = dotColor;
-      ctx.fill();
-
-      // Name
-      ctx.font      = '700 11px system-ui, -apple-system, sans-serif';
+      const dotColor = isImp ? impColor : COLORS[p.colorIdx % COLORS.length];
+      ctx.beginPath(); ctx.arc(xPos + 5, rowY - 3, 4, 0, Math.PI * 2);
+      ctx.fillStyle = dotColor; ctx.fill();
+      ctx.font = '700 11px system-ui, -apple-system, sans-serif';
       ctx.fillStyle = isImp ? impColor : TEXT;
       ctx.fillText(p.name, xPos + 15, rowY);
-
-      // Answer
-      ctx.font      = '11px system-ui, -apple-system, sans-serif';
+      ctx.font = '11px system-ui, -apple-system, sans-serif';
       ctx.fillStyle = isImp ? `${impColor}bb` : MID;
-      const shortA = ans.length > 22 ? ans.slice(0, 22) + '…' : ans;
-      ctx.fillText(`"${shortA}"`, xPos + 15, rowY + 14);
-
+      ctx.fillText(`"${ans.length > 22 ? ans.slice(0, 22) + '…' : ans}"`, xPos + 15, rowY + 14);
       col++;
     });
-
     y = baseY + Math.ceil(players.length / 2) * 30 + 10;
-
-    // ── Footer ─────────────────────────────────────
-    ctx.font      = '600 9px system-ui, -apple-system, sans-serif';
+    ctx.font = '600 9px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = 'rgba(240,244,255,0.13)';
     ctx.fillText('outlier · pass-the-phone party game', PAD, H - 14);
-
   }, [round, totalRounds, groupWon, impNames, qPair, answers, players, mode]);
 
   const handleDownload = useCallback(() => {
@@ -765,13 +641,8 @@ const RoundSummaryCard = memo(function RoundSummaryCard({
   return (
     <div style={{ marginBottom: 18 }}>
       <p style={S.lbl}>Round Card</p>
-      <canvas
-        ref={canvasRef}
-        style={{ width: '100%', borderRadius: 14, display: 'block', border: `1px solid ${T.border}` }}
-      />
-      <button onClick={handleDownload} style={{ ...D.btn('#818CF8', true, true), marginTop: 10 }}>
-        ↓ Save as Image
-      </button>
+      <canvas ref={canvasRef} style={{ width: '100%', borderRadius: 14, display: 'block', border: `1px solid ${T.border}` }} />
+      <button onClick={handleDownload} style={{ ...D.btn('#818CF8', true, true), marginTop: 10 }}>↓ Save as Image</button>
     </div>
   );
 });
@@ -782,15 +653,14 @@ const RoundSummaryCard = memo(function RoundSummaryCard({
 function App() {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
 
-  /* Question packs */
+  /* ── Questions — single unified pool ── */
   const [activePacks, setActivePacks] = useState(['main']);
   const [qs,          setQs]          = useState([]);
-  const [reverseQs,   setReverseQs]   = useState([]);
   const [qLoading,    setQLoading]    = useState(true);
   const [qError,      setQError]      = useState(false);
 
-  /* Custom questions — persisted in localStorage */
-  const [customQuestions, setCustomQuestions] = useState(() => {
+  /* ── Custom questions ── */
+  const [customQuestions,  setCustomQuestions]  = useState(() => {
     try { return JSON.parse(localStorage.getItem('outlier_custom_qs') || '[]'); }
     catch { return []; }
   });
@@ -798,18 +668,14 @@ function App() {
   const [customDraftB,     setCustomDraftB]     = useState('');
   const [showCustomEditor, setShowCustomEditor] = useState(false);
 
-  /* Modifiers */
+  /* ── Modifiers / timer / sound ── */
   const [activeModifiers, setActiveModifiers] = useState([]);
+  const [timeLeft,        setTimeLeft]        = useState(30);
+  const [soundOn,         setSoundOn]         = useState(true);
+  const timerRef     = useRef(null);
+  const submittedRef = useRef(false);
 
-  /* Timer */
-  const [timeLeft,  setTimeLeft]  = useState(30);
-  const timerRef                  = useRef(null);
-  const submittedRef              = useRef(false);
-
-  /* Sound */
-  const [soundOn, setSoundOn] = useState(true);
-
-  /* ── Persist custom questions & clean up activePacks ── */
+  /* ── Persist custom questions ── */
   useEffect(() => {
     localStorage.setItem('outlier_custom_qs', JSON.stringify(customQuestions));
     if (customQuestions.length === 0) {
@@ -821,40 +687,32 @@ function App() {
     }
   }, [customQuestions]);
 
-  /* ── Load questions ── */
+  /* ── Load questions — all packs unified ── */
   useEffect(() => {
     setQLoading(true);
     setQError(false);
 
-    const packPromises = QUESTION_PACKS
-      .filter(p => activePacks.includes(p.id))
-      .map(p => fetch(p.file).then(r => r.ok ? r.json() : []).catch(() => []));
+    const filePacks = QUESTION_PACKS.filter(p => activePacks.includes(p.id));
+    const promises  = filePacks.map(p =>
+      fetch(p.file).then(r => r.ok ? r.json() : []).catch(() => [])
+    );
 
-    const reversePromise = fetch('questions/Reverse.JSON')
-      .then(r => r.ok ? r.json() : [])
-      .catch(() => []);
+    Promise.all(promises).then(results => {
+      const fromFiles = results.flat();
+      const custom    = activePacks.includes('custom') ? customQuestions : [];
+      const combined  = [...fromFiles, ...custom];
 
-    Promise.all([...packPromises, reversePromise])
-      .then(results => {
-        const reversed   = results.pop();
-        const fromFiles  = results.flat();
-        const combined   = activePacks.includes('custom')
-          ? [...fromFiles, ...customQuestions]
-          : fromFiles;
-        setReverseQs(reversed);
-        const filePackSelected = activePacks.some(id => QUESTION_PACKS.find(p => p.id === id));
-        if (fromFiles.length === 0 && filePackSelected) {
-          setQError(true);
-        } else {
-          setQs(combined);
-          setQError(false);
-        }
-        setQLoading(false);
-      })
-      .catch(() => { setQError(true); setQLoading(false); });
+      if (combined.length === 0) {
+        setQError(true);
+      } else {
+        setQs(combined);
+        setQError(false);
+      }
+      setQLoading(false);
+    }).catch(() => { setQError(true); setQLoading(false); });
   }, [activePacks, customQuestions]);
 
-  /* ── Timer countdown ── */
+  /* ── Timer ── */
   useEffect(() => {
     clearInterval(timerRef.current);
     submittedRef.current = false;
@@ -874,7 +732,7 @@ function App() {
           return 0;
         }
         if (next <= 3)      { SoundEngine.timerWarn(); haptic(40); }
-        else if (next <= 5) { SoundEngine.tick(); haptic(20); }
+        else if (next <= 5) { SoundEngine.tick();      haptic(20); }
         return next;
       });
     }, 1000);
@@ -905,7 +763,7 @@ function App() {
     }
   }, [state.phase, state.revealStage, state.groupWon]);
 
-  /* ── Derived values ── */
+  /* ── Derived ── */
   const validPlayers  = state.players.filter(p => p.name.trim());
   const pc            = validPlayers.length;
   const mInfo         = MODES.find(m => m.id === state.mode) || MODES[0];
@@ -934,23 +792,18 @@ function App() {
   const isReverse = state.mode === 'reverse';
 
   const accentColor =
-    ['q_handoff', 'question'].includes(state.phase)     ? curAnsColor :
-    ['vote_handoff', 'vote_cast'].includes(state.phase)  ? voteAccent  :
+    ['q_handoff', 'question'].includes(state.phase)    ? curAnsColor :
+    ['vote_handoff', 'vote_cast'].includes(state.phase) ? voteAccent  :
     mInfo.color;
 
-  const enoughQs = state.mode === 'reverse'
-    ? reverseQs.length > 0
-    : qs.length > 0;
-  const canStart =
-    validPlayers.length >= 2 &&
-    (state.mode !== 'doublecross' || validPlayers.length >= 3) &&
-    enoughQs;
+  const canStart = validPlayers.length >= 2
+    && (state.mode !== 'doublecross' || validPlayers.length >= 3)
+    && qs.length > 0;
 
-  /* character counter colour */
-  const charCount   = state.writing.length;
-  const charWarn    = charCount >= ANSWER_CHAR_LIMIT;
-  const charNear    = charCount >= Math.floor(ANSWER_CHAR_LIMIT * 0.85);
-  const charColor   = charWarn ? '#FF6B6B' : charNear ? '#FF9F45' : T.textDim;
+  const charCount = state.writing.length;
+  const charColor = charCount >= ANSWER_CHAR_LIMIT ? '#FF6B6B'
+                  : charCount >= Math.floor(ANSWER_CHAR_LIMIT * 0.85) ? '#FF9F45'
+                  : T.textDim;
 
   /* ── Handlers ── */
   const togglePack = useCallback((id) => {
@@ -962,25 +815,20 @@ function App() {
   }, []);
 
   const toggleModifier = useCallback((id) => {
-    setActiveModifiers(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+    setActiveModifiers(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   }, []);
 
   const handleAddCustomQuestion = useCallback(() => {
     if (!customDraftA.trim() || !customDraftB.trim()) return;
-    haptic(30);
-    SoundEngine.click();
-    setCustomQuestions(prev => [...prev, { a: customDraftA.trim(), b: customDraftB.trim() }]);
-    setCustomDraftA('');
-    setCustomDraftB('');
-    // Auto-enable the custom pack if it isn't already
+    haptic(30); SoundEngine.click();
+    /* Custom questions use the same variants format — A and B become two of the ten slots */
+    setCustomQuestions(prev => [...prev, { variants: [customDraftA.trim(), customDraftB.trim()] }]);
+    setCustomDraftA(''); setCustomDraftB('');
     setActivePacks(prev => prev.includes('custom') ? prev : [...prev, 'custom']);
   }, [customDraftA, customDraftB]);
 
   const handleDeleteCustomQuestion = useCallback((index) => {
-    haptic(20);
-    SoundEngine.click();
+    haptic(20); SoundEngine.click();
     setCustomQuestions(prev => prev.filter((_, i) => i !== index));
   }, []);
 
@@ -988,75 +836,53 @@ function App() {
     const valid = state.players.filter(p => p.name.trim());
     if (valid.length < 2) return;
     if (state.mode === 'doublecross' && valid.length < 3) return;
-
     const lower = valid.map(p => p.name.trim().toLowerCase());
     if (lower.length !== new Set(lower).size) {
       dispatch({ type: 'SET_NAME_ERROR', error: '⚠️ Two players have the same name — each name must be unique.' });
       return;
     }
-
     haptic([40, 20, 80]);
     resetRNG();
-    const roundData = createRound({
-      players:          valid,
-      mode:             state.mode,
-      questions:        qs,
-      reverseQuestions: reverseQs,
-      used:             [],
-    });
+    const roundData = createRound({ players: valid, mode: state.mode, questions: qs, used: [] });
     dispatch({ type: 'BEGIN_GAME', validPlayers: valid, roundData });
     SoundEngine.click();
-  }, [state.players, state.mode, qs, reverseQs]);
+  }, [state.players, state.mode, qs]);
 
   const handleSubmitAnswer = useCallback(() => {
     submittedRef.current = true;
     clearInterval(timerRef.current);
-    haptic([40, 30, 40]);
-    SoundEngine.submit();
+    haptic([40, 30, 40]); SoundEngine.submit();
     dispatch({ type: 'SUBMIT_ANSWER' });
   }, []);
 
   const handleCastVote = useCallback((suspect) => {
-    haptic(25);
-    SoundEngine.vote();
+    haptic(25); SoundEngine.vote();
     dispatch({ type: 'CAST_VOTE', suspect });
   }, []);
 
   const handleConfirmVote = useCallback(() => {
-    haptic(35);
-    SoundEngine.click();
+    haptic(35); SoundEngine.click();
     dispatch({ type: 'CONFIRM_VOTE' });
   }, []);
 
   const handleNextRound = useCallback(() => {
-    haptic(30);
-    SoundEngine.click();
+    haptic(30); SoundEngine.click();
     if (state.round >= state.totalRounds) { dispatch({ type: 'GO_FINAL' }); return; }
-    const roundData = createRound({
-      players:          state.players,
-      mode:             state.mode,
-      questions:        qs,
-      reverseQuestions: reverseQs,
-      used:             state.usedIdx,
-    });
+    const roundData = createRound({ players: state.players, mode: state.mode, questions: qs, used: state.usedIdx });
     dispatch({ type: 'NEXT_ROUND', roundData, newRound: state.round + 1 });
-  }, [state.round, state.totalRounds, state.players, state.mode, state.usedIdx, qs, reverseQs]);
+  }, [state.round, state.totalRounds, state.players, state.mode, state.usedIdx, qs]);
 
   const handleToggleSound = useCallback(() => {
-    const next = SoundEngine.toggle();
-    setSoundOn(next);
-    haptic(20);
+    const next = SoundEngine.toggle(); setSoundOn(next); haptic(20);
   }, []);
 
   const handleShowQuestion = useCallback(() => {
-    haptic(30);
-    SoundEngine.click();
+    haptic(30); SoundEngine.click();
     dispatch({ type: 'SET_PHASE', phase: 'question' });
   }, []);
 
   const handleShowVote = useCallback(() => {
-    haptic(30);
-    SoundEngine.click();
+    haptic(30); SoundEngine.click();
     dispatch({ type: 'SET_PHASE', phase: 'vote_cast' });
   }, []);
 
@@ -1066,7 +892,6 @@ function App() {
       <BlobBG accent={accentColor} />
       <Confetti active={state.confetti} />
 
-      {/* Sound toggle */}
       {state.phase !== 'setup' && (
         <button onClick={handleToggleSound} style={{ position: 'fixed', top: 14, right: 14, zIndex: 100, width: 38, height: 38, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: `1px solid ${T.border}`, color: soundOn ? T.text : T.textDim, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
           {soundOn ? '🔊' : '🔇'}
@@ -1098,7 +923,6 @@ function App() {
       {!qLoading && !qError && state.phase === 'setup' && (
         <div style={{ ...S.card, animation: 'fadeUp .35s ease both' }}>
 
-          {/* Title */}
           <div style={{ textAlign: 'center', marginBottom: 28 }}>
             <div style={{ fontSize: 56, display: 'inline-block', marginBottom: 2, filter: 'drop-shadow(0 0 22px rgba(99,102,241,0.5))', animation: 'bounce 3s ease-in-out infinite' }}>🕵️</div>
             <h1 className="title-gradient" style={{ fontSize: 54, fontWeight: 900, letterSpacing: '-2.5px', lineHeight: 1, margin: 0 }}>OUTLIER</h1>
@@ -1175,7 +999,7 @@ function App() {
 
           {/* Question Packs */}
           <p style={S.lbl}>Question Packs</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 22 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 10 }}>
             {QUESTION_PACKS.map(pack => {
               const active    = activePacks.includes(pack.id);
               const isOnlyOne = activePacks.length === 1 && active;
@@ -1190,15 +1014,13 @@ function App() {
                     <div style={{ width: 20, height: 20, borderRadius: '50%', flexShrink: 0, background: active ? '#4DA6FF' : 'rgba(255,255,255,0.07)', border: `1.5px solid ${active ? '#4DA6FF' : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, color: '#fff', transition: 'all .18s' }}>{active ? '✓' : ''}</div>
                   </button>
                   {pack.notice && active && (
-                    <div style={{ padding: '7px 13px', borderRadius: `0 0 ${T.r}px ${T.r}px`, background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(77,166,255,0.35)', borderTop: 'none', fontSize: 11, color: 'rgba(251,191,36,0.8)', fontWeight: 600, lineHeight: 1.45 }}>
-                      ⚠️ {pack.notice}
-                    </div>
+                    <div style={{ padding: '7px 13px', borderRadius: `0 0 ${T.r}px ${T.r}px`, background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(77,166,255,0.35)', borderTop: 'none', fontSize: 11, color: 'rgba(251,191,36,0.8)', fontWeight: 600, lineHeight: 1.45 }}>⚠️ {pack.notice}</div>
                   )}
                 </React.Fragment>
               );
             })}
 
-            {/* Custom pack toggle — only shows when there are custom questions */}
+            {/* Custom pack toggle */}
             {customQuestions.length > 0 && (() => {
               const active    = activePacks.includes('custom');
               const isOnlyOne = activePacks.length === 1 && active;
@@ -1213,20 +1035,18 @@ function App() {
                 </button>
               );
             })()}
-
-            {state.mode === 'reverse' && (
-              <div style={{ padding: '10px 14px', borderRadius: T.r, border: '1px solid rgba(86,207,178,0.3)', background: 'rgba(86,207,178,0.06)', fontSize: 12, color: 'rgba(86,207,178,0.85)', fontWeight: 600 }}>
-                🔄 Reverse mode uses its own built-in question pack automatically.
-              </div>
-            )}
           </div>
+
+          {/* Reverse mode hint */}
+          {state.mode === 'reverse' && (
+            <div style={{ padding: '10px 14px', borderRadius: T.r, border: '1px solid rgba(86,207,178,0.3)', background: 'rgba(86,207,178,0.06)', fontSize: 12, color: 'rgba(86,207,178,0.85)', fontWeight: 600, marginBottom: 14 }}>
+              🔄 The <strong>Reverse</strong> pack is curated for this mode, but any pack works.
+            </div>
+          )}
 
           {/* ── Custom Question Editor ── */}
           <div style={{ marginBottom: 22 }}>
-            <button
-              onClick={() => { haptic(15); setShowCustomEditor(v => !v); }}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '12px 16px', borderRadius: showCustomEditor ? `${T.r}px ${T.r}px 0 0` : T.r, border: `1px solid ${showCustomEditor ? 'rgba(192,132,252,0.35)' : T.border}`, borderBottom: showCustomEditor ? 'none' : undefined, background: showCustomEditor ? 'rgba(192,132,252,0.07)' : T.surface, fontFamily: 'inherit', cursor: 'pointer', transition: 'all .18s' }}
-            >
+            <button onClick={() => { haptic(15); setShowCustomEditor(v => !v); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '12px 16px', borderRadius: showCustomEditor ? `${T.r}px ${T.r}px 0 0` : T.r, border: `1px solid ${showCustomEditor ? 'rgba(192,132,252,0.35)' : T.border}`, borderBottom: showCustomEditor ? 'none' : undefined, background: showCustomEditor ? 'rgba(192,132,252,0.07)' : T.surface, fontFamily: 'inherit', cursor: 'pointer', transition: 'all .18s' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontSize: 18 }}>✏️</span>
                 <div style={{ textAlign: 'left' }}>
@@ -1234,7 +1054,7 @@ function App() {
                   <span style={{ fontSize: 11, color: T.textDim }}>{customQuestions.length > 0 ? `${customQuestions.length} saved` : 'Add your own question pairs'}</span>
                 </div>
               </div>
-              <span style={{ color: T.textDim, fontSize: 18, fontWeight: 700, transition: 'transform .2s', display: 'inline-block', transform: showCustomEditor ? 'rotate(180deg)' : 'none' }}>⌄</span>
+              <span style={{ color: T.textDim, fontSize: 18, fontWeight: 700, display: 'inline-block', transition: 'transform .2s', transform: showCustomEditor ? 'rotate(180deg)' : 'none' }}>⌄</span>
             </button>
 
             {showCustomEditor && (
@@ -1242,35 +1062,15 @@ function App() {
                 <p style={{ ...S.lbl, color: 'rgba(192,132,252,0.6)', marginBottom: 8 }}>New question pair</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
                   <div>
-                    <label style={{ fontSize: 10, color: T.textDim, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', display: 'block', marginBottom: 5 }}>Question A — shown to most players</label>
-                    <input
-                      value={customDraftA}
-                      onChange={e => setCustomDraftA(e.target.value)}
-                      placeholder="e.g. What's your go-to road trip snack?"
-                      style={S.inp}
-                      onFocus={e => { e.target.style.borderColor = '#C084FC'; e.target.style.boxShadow = '0 0 0 3px rgba(192,132,252,0.12)'; }}
-                      onBlur={e  => { e.target.style.borderColor = T.border;  e.target.style.boxShadow = 'none'; }}
-                    />
+                    <label style={{ fontSize: 10, color: T.textDim, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', display: 'block', marginBottom: 5 }}>Question A — most players</label>
+                    <input value={customDraftA} onChange={e => setCustomDraftA(e.target.value)} placeholder="e.g. What's your go-to road trip snack?" style={S.inp} onFocus={e => { e.target.style.borderColor = '#C084FC'; e.target.style.boxShadow = '0 0 0 3px rgba(192,132,252,0.12)'; }} onBlur={e => { e.target.style.borderColor = T.border; e.target.style.boxShadow = 'none'; }} />
                   </div>
                   <div>
-                    <label style={{ fontSize: 10, color: T.textDim, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', display: 'block', marginBottom: 5 }}>Question B — shown to the outlier</label>
-                    <input
-                      value={customDraftB}
-                      onChange={e => setCustomDraftB(e.target.value)}
-                      placeholder="e.g. What do you always eat on a long drive?"
-                      style={S.inp}
-                      onFocus={e => { e.target.style.borderColor = '#C084FC'; e.target.style.boxShadow = '0 0 0 3px rgba(192,132,252,0.12)'; }}
-                      onBlur={e  => { e.target.style.borderColor = T.border;  e.target.style.boxShadow = 'none'; }}
-                    />
+                    <label style={{ fontSize: 10, color: T.textDim, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', display: 'block', marginBottom: 5 }}>Question B — the outlier</label>
+                    <input value={customDraftB} onChange={e => setCustomDraftB(e.target.value)} placeholder="e.g. What do you always eat on a long drive?" style={S.inp} onFocus={e => { e.target.style.borderColor = '#C084FC'; e.target.style.boxShadow = '0 0 0 3px rgba(192,132,252,0.12)'; }} onBlur={e => { e.target.style.borderColor = T.border; e.target.style.boxShadow = 'none'; }} />
                   </div>
                 </div>
-                <button
-                  onClick={handleAddCustomQuestion}
-                  disabled={!customDraftA.trim() || !customDraftB.trim()}
-                  style={D.btn('#C084FC', false, true, !customDraftA.trim() || !customDraftB.trim())}
-                >
-                  + Add Question
-                </button>
+                <button onClick={handleAddCustomQuestion} disabled={!customDraftA.trim() || !customDraftB.trim()} style={D.btn('#C084FC', false, true, !customDraftA.trim() || !customDraftB.trim())}>+ Add Question</button>
 
                 {customQuestions.length > 0 && (
                   <div style={{ marginTop: 16 }}>
@@ -1279,10 +1079,10 @@ function App() {
                       {customQuestions.map((q, i) => (
                         <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 13px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.border}`, borderRadius: 12 }}>
                           <div style={{ flex: 1 }}>
-                            <p style={{ fontSize: 12, color: T.textMid, margin: '0 0 3px', lineHeight: 1.5 }}>{q.a}</p>
-                            <p style={{ fontSize: 11, color: T.textDim, margin: 0, fontStyle: 'italic', lineHeight: 1.4 }}>Outlier: {q.b}</p>
+                            <p style={{ fontSize: 12, color: T.textMid, margin: '0 0 3px', lineHeight: 1.5 }}>{q.variants[0]}</p>
+                            <p style={{ fontSize: 11, color: T.textDim, margin: 0, fontStyle: 'italic', lineHeight: 1.4 }}>Outlier: {q.variants[1]}</p>
                           </div>
-                          <button onClick={() => handleDeleteCustomQuestion(i)} style={{ background: 'none', border: 'none', color: T.textDim, fontSize: 20, cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0, marginTop: 1 }}>×</button>
+                          <button onClick={() => handleDeleteCustomQuestion(i)} style={{ background: 'none', border: 'none', color: T.textDim, fontSize: 20, cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
                         </div>
                       ))}
                     </div>
@@ -1300,14 +1100,7 @@ function App() {
               return (
                 <div key={player.id} style={{ display: 'flex', gap: 9, alignItems: 'center' }}>
                   <div style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, background: col + '18', border: `1.5px solid ${col}55`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: col }}>{i + 1}</div>
-                  <input
-                    value={player.name}
-                    onChange={e => dispatch({ type: 'UPDATE_PLAYER_NAME', id: player.id, name: e.target.value })}
-                    placeholder={`Player ${i + 1}`}
-                    style={S.inp}
-                    onFocus={e => { e.target.style.borderColor = col; e.target.style.boxShadow = `0 0 0 3px ${col}18`; }}
-                    onBlur={e  => { e.target.style.borderColor = T.border; e.target.style.boxShadow = 'none'; }}
-                  />
+                  <input value={player.name} onChange={e => dispatch({ type: 'UPDATE_PLAYER_NAME', id: player.id, name: e.target.value })} placeholder={`Player ${i + 1}`} style={S.inp} onFocus={e => { e.target.style.borderColor = col; e.target.style.boxShadow = `0 0 0 3px ${col}18`; }} onBlur={e => { e.target.style.borderColor = T.border; e.target.style.boxShadow = 'none'; }} />
                   {state.players.length > 2 && (
                     <button onClick={() => dispatch({ type: 'REMOVE_PLAYER', id: player.id })} style={{ background: 'none', border: 'none', color: T.textDim, fontSize: 22, padding: '0 4px', lineHeight: 1, cursor: 'pointer' }}>×</button>
                   )}
@@ -1324,15 +1117,13 @@ function App() {
             {state.players.length < 10 && (
               <button onClick={() => dispatch({ type: 'ADD_PLAYER' })} style={{ flex: 1, padding: '12px', borderRadius: 13, border: `1px solid ${T.border}`, background: T.surface, color: T.textMid, fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>+ Add Player</button>
             )}
-            <button onClick={handleBeginGame} disabled={!canStart} style={{ ...D.btn('grad', false, false, !canStart), flex: 2 }}>
-              START GAME →
-            </button>
+            <button onClick={handleBeginGame} disabled={!canStart} style={{ ...D.btn('grad', false, false, !canStart), flex: 2 }}>START GAME →</button>
           </div>
 
           {state.mode === 'doublecross' && validPlayers.length < 3 && (
             <p style={{ color: 'rgba(255,107,107,0.8)', fontSize: 12, textAlign: 'center', fontWeight: 700, animation: 'pulse 1.5s infinite' }}>⚠️ Double Cross needs at least 3 players</p>
           )}
-          {state.mode !== 'reverse' && qs.length === 0 && !qLoading && (
+          {qs.length === 0 && !qLoading && (
             <p style={{ color: 'rgba(255,159,69,0.8)', fontSize: 12, textAlign: 'center', fontWeight: 700 }}>⚠️ Select at least one question pack to play</p>
           )}
         </div>
@@ -1346,7 +1137,6 @@ function App() {
       {/* ════ QUESTION ════ */}
       {state.phase === 'question' && (
         <div style={{ ...S.card, textAlign: 'center', animation: 'slideR .3s ease both' }}>
-          {/* Mode pill */}
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
             <div style={{ background: `${mInfo.color}18`, border: `1px solid ${mInfo.color}40`, borderRadius: 99, padding: '5px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 12 }}>{mInfo.emoji}</span>
@@ -1361,33 +1151,26 @@ function App() {
           <p style={{ color: T.textDim, fontSize: 13, marginBottom: 18, fontWeight: 600 }}>{state.curAns + 1} of {pc}</p>
 
           {state.timerEnabled && <TimerBar timeLeft={timeLeft} total={state.timerSeconds} accent={curAnsColor} />}
-
           <ModifierBanner modifiers={activeModInfo} />
 
-          {/* Imposter alert */}
           {curIsImp && state.mode !== 'clueless' && state.mode !== 'reverse' && (
             <div style={{ background: 'rgba(255,107,107,0.08)', border: '1.5px solid rgba(255,107,107,0.5)', borderRadius: T.r, padding: '13px 16px', marginBottom: 14, boxShadow: '0 0 30px rgba(255,107,107,0.2)', animation: 'popIn .35s ease both' }}>
               <p style={{ fontSize: 16, fontWeight: 900, margin: '0 0 4px', color: '#FF6B6B' }}>🎭 You are the outlier!</p>
-              <p style={{ fontSize: 12, color: T.textMid, margin: 0, lineHeight: 1.5 }}>
-                {state.mode === 'doublecross' ? "There's one other outlier — but you don't know who. Blend in!" : "Blend in with your answer. Don't get caught!"}
-              </p>
+              <p style={{ fontSize: 12, color: T.textMid, margin: 0, lineHeight: 1.5 }}>{state.mode === 'doublecross' ? "There's one other outlier — but you don't know who. Blend in!" : "Blend in with your answer. Don't get caught!"}</p>
             </div>
           )}
 
-          {/* Reverse mode context */}
           {isReverse && (
             <div style={{ background: 'rgba(86,207,178,0.07)', border: '1px solid rgba(86,207,178,0.3)', borderRadius: T.r, padding: '10px 14px', marginBottom: 14 }}>
-              <p style={{ fontSize: 12, color: 'rgba(86,207,178,0.8)', margin: 0, fontWeight: 600 }}>🔄 Everyone gets a different question — but two players share the same one. After voting, find the pair!</p>
+              <p style={{ fontSize: 12, color: 'rgba(86,207,178,0.8)', margin: 0, fontWeight: 600 }}>🔄 Everyone gets a different question — but two players share the same one. Find the pair!</p>
             </div>
           )}
 
-          {/* Question card */}
           <div style={{ background: `${curAnsColor}14`, border: `1.5px solid ${curAnsColor}45`, borderRadius: T.rl, padding: '22px 18px', marginBottom: 16, boxShadow: `0 0 30px ${curAnsColor}20` }}>
             <p style={{ ...S.lbl, textAlign: 'center', color: curAnsColor + 'cc', marginBottom: 10 }}>Your question</p>
             <p style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.55, color: T.text, margin: 0 }}>{curQ}</p>
           </div>
 
-          {/* Answer with character counter */}
           <div style={{ textAlign: 'left', marginBottom: 14 }}>
             <label style={S.lbl}>Your answer</label>
             <textarea
@@ -1399,9 +1182,7 @@ function App() {
               style={{ ...S.inp, border: `1.5px solid ${curAnsColor}50`, lineHeight: 1.6, boxShadow: `0 0 0 3px ${curAnsColor}10` }}
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 5 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: charColor, transition: 'color .2s' }}>
-                {charCount} / {ANSWER_CHAR_LIMIT}
-              </span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: charColor, transition: 'color .2s' }}>{charCount} / {ANSWER_CHAR_LIMIT}</span>
             </div>
           </div>
 
@@ -1428,17 +1209,13 @@ function App() {
               </div>
             </div>
             <p style={{ color: T.textMid, fontSize: 13, fontWeight: 600 }}>
-              {state.mode === 'doublecross'
-                ? 'Pick your 2 suspects — both could be outliers!'
-                : isReverse
-                  ? 'Vote for who you think had the same question as someone else'
-                  : 'Tap who you think had the different question'}
+              {state.mode === 'doublecross' ? 'Pick your 2 suspects — both could be outliers!' : isReverse ? 'Vote for who you think had the same question as someone else' : 'Tap who you think had the different question'}
             </p>
           </div>
 
           <p style={S.lbl}>Everyone's Answers</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-            {state.players.map((player) => {
+            {state.players.map(player => {
               const col    = COLORS[player.colorIdx];
               const picks  = state.mode === 'doublecross' ? (curVoterPicks || []) : (curVoterPicks ? [curVoterPicks] : []);
               const picked = picks.includes(player.name);
@@ -1473,34 +1250,23 @@ function App() {
       {/* ════ REVEAL ════ */}
       {state.phase === 'reveal' && (
         <div style={{ ...S.card, animation: 'fadeUp .35s ease both' }}>
-
-          {/* Stage 0 — suspense */}
           {state.revealStage === 0 && (
             <div style={{ textAlign: 'center', padding: '44px 20px', animation: 'fadeIn .4s ease' }}>
               <div style={{ fontSize: 68, marginBottom: 20, display: 'inline-block', animation: 'spin 2.2s linear infinite' }}>🎭</div>
-              <h2 style={{ fontSize: 22, fontWeight: 900, color: T.textMid, marginBottom: 8 }}>
-                {isReverse ? 'Revealing the matching pair…' : impNames.length > 1 ? 'Revealing the outliers…' : 'Revealing the outlier…'}
-              </h2>
+              <h2 style={{ fontSize: 22, fontWeight: 900, color: T.textMid, marginBottom: 8 }}>{isReverse ? 'Revealing the matching pair…' : impNames.length > 1 ? 'Revealing the outliers…' : 'Revealing the outlier…'}</h2>
               <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 24 }}>
                 {[0, 1, 2].map(i => <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.25)', animation: `pulse 1s ease-in-out ${i * 0.33}s infinite` }} />)}
               </div>
             </div>
           )}
 
-          {/* Stage 1+ — result banner */}
           {state.revealStage >= 1 && (
             <div style={{ background: groupWon ? 'rgba(52,211,153,0.07)' : 'rgba(255,107,107,0.07)', border: `1.5px solid ${groupWon ? 'rgba(52,211,153,0.4)' : 'rgba(255,107,107,0.4)'}`, borderRadius: T.rx, padding: '24px 20px', textAlign: 'center', marginBottom: 16, boxShadow: `0 0 50px ${groupWon ? 'rgba(52,211,153,0.2)' : 'rgba(255,107,107,0.2)'}`, animation: 'popIn .5s ease both' }}>
               <div style={{ fontSize: 50, marginBottom: 10, animation: groupWon ? 'bounce .9s ease-in-out infinite' : 'none' }}>{groupWon ? '🎉' : '😈'}</div>
-              <p style={{ fontSize: 10, letterSpacing: 3.5, textTransform: 'uppercase', color: T.textDim, fontWeight: 700, marginBottom: 8 }}>
-                {isReverse ? 'The matching pair was' : impNames.length > 1 ? 'The outliers were' : 'The outlier was'}
-              </p>
-              <h2 style={{ fontSize: impNames.length > 1 ? 30 : 42, fontWeight: 900, margin: '0 0 14px', letterSpacing: '-1px', color: groupWon ? '#34D399' : '#FF6B6B', textShadow: `0 0 50px ${groupWon ? '#34D39988' : '#FF6B6B88'}`, animation: 'revealName .7s ease both' }}>
-                {impNames.join(' & ')}
-              </h2>
+              <p style={{ fontSize: 10, letterSpacing: 3.5, textTransform: 'uppercase', color: T.textDim, fontWeight: 700, marginBottom: 8 }}>{isReverse ? 'The matching pair was' : impNames.length > 1 ? 'The outliers were' : 'The outlier was'}</p>
+              <h2 style={{ fontSize: impNames.length > 1 ? 30 : 42, fontWeight: 900, margin: '0 0 14px', letterSpacing: '-1px', color: groupWon ? '#34D399' : '#FF6B6B', textShadow: `0 0 50px ${groupWon ? '#34D39988' : '#FF6B6B88'}`, animation: 'revealName .7s ease both' }}>{impNames.join(' & ')}</h2>
               <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: '12px 14px', marginBottom: 10, textAlign: 'left', border: `1px solid ${T.border}` }}>
-                <p style={{ fontSize: 9, color: T.textDim, letterSpacing: 3, textTransform: 'uppercase', fontWeight: 700, marginBottom: 5 }}>
-                  {isReverse ? 'Their shared question was' : 'Their question was'}
-                </p>
+                <p style={{ fontSize: 9, color: T.textDim, letterSpacing: 3, textTransform: 'uppercase', fontWeight: 700, marginBottom: 5 }}>{isReverse ? 'Their shared question was' : 'Their question was'}</p>
                 <p style={{ fontSize: 13, fontStyle: 'italic', color: T.textMid, lineHeight: 1.55 }}>"{state.qPair?.b}"</p>
               </div>
               {!isReverse && (
@@ -1510,26 +1276,19 @@ function App() {
                 </>
               )}
               <p style={{ fontSize: 20, fontWeight: 900, marginTop: 16, color: groupWon ? '#34D399' : '#FF6B6B' }}>
-                {isReverse
-                  ? (groupWon ? 'Pair identified! 🎊' : 'Twins escaped! 😂')
-                  : (groupWon ? 'Group wins! 🎊' : 'Outlier escapes! 😂')}
+                {isReverse ? (groupWon ? 'Pair identified! 🎊' : 'Twins escaped! 😂') : (groupWon ? 'Group wins! 🎊' : 'Outlier escapes! 😂')}
               </p>
             </div>
           )}
 
-          {/* Stage 2+ — vote breakdown */}
           {state.revealStage >= 2 && (
             <div style={{ animation: 'fadeUp .4s ease both' }}>
               <p style={S.lbl}>Who voted for whom</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 16 }}>
                 {state.players.map((player, i) => {
-                  const vFor = state.mode === 'doublecross'
-                    ? (state.votes[player.name] || []).join(' & ') || '—'
-                    : state.votes[player.name] || '—';
-                  const correct = state.mode === 'doublecross'
-                    ? (state.votes[player.name] || []).some(v => impNames.includes(v))
-                    : impNames.includes(state.votes[player.name]);
-                  const col = COLORS[player.colorIdx];
+                  const vFor    = state.mode === 'doublecross' ? (state.votes[player.name] || []).join(' & ') || '—' : state.votes[player.name] || '—';
+                  const correct = state.mode === 'doublecross' ? (state.votes[player.name] || []).some(v => impNames.includes(v)) : impNames.includes(state.votes[player.name]);
+                  const col     = COLORS[player.colorIdx];
                   return (
                     <div key={player.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: correct ? 'rgba(52,211,153,0.07)' : 'rgba(255,255,255,0.03)', border: `1px solid ${correct ? 'rgba(52,211,153,0.3)' : T.border}`, borderRadius: 12, animation: 'stagger .35s ease both', animationDelay: `${i * 50}ms` }}>
                       <div style={D.avatar(col, 28)}>{player.name[0]?.toUpperCase()}</div>
@@ -1544,27 +1303,13 @@ function App() {
             </div>
           )}
 
-          {/* Stage 3 — round card + leaderboard + next */}
           {state.revealStage >= 3 && (
             <div style={{ animation: 'fadeUp .4s ease both' }}>
               <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)', margin: '20px 0' }} />
-
               {state.questionsCycled && (
                 <p style={{ color: 'rgba(255,159,69,0.65)', fontSize: 11, textAlign: 'center', marginBottom: 12, fontStyle: 'italic' }}>🔄 All questions used — cycling back through the deck</p>
               )}
-
-              {/* Round Summary Card */}
-              <RoundSummaryCard
-                round={state.round}
-                totalRounds={state.totalRounds}
-                groupWon={groupWon}
-                impNames={impNames}
-                qPair={state.qPair}
-                answers={state.answers}
-                players={state.players}
-                mode={state.mode}
-              />
-
+              <RoundSummaryCard round={state.round} totalRounds={state.totalRounds} groupWon={groupWon} impNames={impNames} qPair={state.qPair} answers={state.answers} players={state.players} mode={state.mode} />
               <p style={{ ...S.lbl, marginBottom: 12 }}>Leaderboard · Round {state.round}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 20 }}>
                 {Object.entries(state.scores).sort((a, b) => b[1] - a[1]).map(([name, pts], i) => {
