@@ -1,9 +1,46 @@
 /* ════════════════════════════════════════
+   CSS VARIABLES
+   Change a theme value once, not 6 times.
+════════════════════════════════════════ */
+:root {
+  --bg-main:      #0c0c1b;
+  --white-faint:  #ffffff28;  /* placeholder text, subtle borders */
+  --white-soft:   #ffffff20;  /* scrollbar thumb, light surfaces  */
+  --white-dim:    #ffffff55;  /* improved placeholder contrast    */
+}
+
+/* ════════════════════════════════════════
    RESET
 ════════════════════════════════════════ */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; overflow-x: hidden; background: #0c0c1b; }
-body { font-family: 'Trebuchet MS', 'Segoe UI', sans-serif; color: #fff; -webkit-tap-highlight-color: transparent; }
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+
+  /* #12 — text just looks better, nobody notices why */
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+html {
+  height: 100%;
+  overflow-x: hidden;
+  background: var(--bg-main);
+
+  /* #11 — prevents iOS auto-zoom on input focus */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  height: 100%;
+  overflow-x: hidden;
+  font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+  color: #fff;
+  -webkit-tap-highlight-color: transparent;
+
+  /* #10 — consistent text rendering everywhere */
+  line-height: 1.5;
+}
 
 /* ════════════════════════════════════════
    KEYFRAMES
@@ -22,7 +59,7 @@ body { font-family: 'Trebuchet MS', 'Segoe UI', sans-serif; color: #fff; -webkit
   50%       { opacity: 1;  }
 }
 @keyframes bounce {
-  0%, 100% { transform: translateY(0);    }
+  0%, 100% { transform: translateY(0);     }
   40%       { transform: translateY(-12px); }
   70%       { transform: translateY(-5px);  }
 }
@@ -36,7 +73,7 @@ body { font-family: 'Trebuchet MS', 'Segoe UI', sans-serif; color: #fff; -webkit
 }
 @keyframes spin       { to { transform: rotate(360deg); } }
 @keyframes shimmer    { 0% { background-position: -300% center; } 100% { background-position: 300% center; } }
-@keyframes crown      { 0%, 100% { transform: rotate(-6deg) scale(1);    } 50% { transform: rotate(6deg) scale(1.12); } }
+@keyframes crown      { 0%, 100% { transform: rotate(-6deg) scale(1);   } 50% { transform: rotate(6deg) scale(1.12); } }
 @keyframes revealName {
   0%   { opacity: 0; transform: scale(.5) translateY(10px); filter: blur(8px); }
   70%  {             transform: scale(1.06) translateY(-4px); filter: blur(0);  }
@@ -46,46 +83,82 @@ body { font-family: 'Trebuchet MS', 'Segoe UI', sans-serif; color: #fff; -webkit
   0%, 100% { transform: scale(1);    }
   50%       { transform: scale(1.12); }
 }
-@keyframes drift1 { 0%, 100% { transform: translate(0, 0) scale(1);        } 50% { transform: translate(40px, -30px) scale(1.15); } }
-@keyframes drift2 { 0%, 100% { transform: translate(0, 0) scale(1);        } 50% { transform: translate(-35px, 28px) scale(.9);   } }
-@keyframes drift3 { 0%, 100% { transform: translate(0, 0) scale(1);        } 50% { transform: translate(18px, 32px)  scale(1.08); } }
+@keyframes drift1 { 0%, 100% { transform: translate(0, 0) scale(1);   } 50% { transform: translate(40px, -30px) scale(1.15); } }
+@keyframes drift2 { 0%, 100% { transform: translate(0, 0) scale(1);   } 50% { transform: translate(-35px, 28px) scale(.9);   } }
+@keyframes drift3 { 0%, 100% { transform: translate(0, 0) scale(1);   } 50% { transform: translate(18px, 32px)  scale(1.08); } }
+
+/* ════════════════════════════════════════
+   ACCESSIBILITY — REDUCED MOTION
+   Respects users who have vestibular
+   disorders or simply dislike motion.
+════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
 
 /* ════════════════════════════════════════
    FORM ELEMENTS
 ════════════════════════════════════════ */
 input::placeholder,
-textarea::placeholder { color: #ffffff28; }
+textarea::placeholder {
+  /* #12 — was #ffffff28, barely visible */
+  color: var(--white-dim);
+}
+
 textarea { resize: none; }
 
 /* ════════════════════════════════════════
    BUTTONS
 ════════════════════════════════════════ */
 button {
-  font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+  /* #1 — inherit instead of repeating the font stack */
+  font-family: inherit;
   cursor: pointer;
   transition: opacity .15s, transform .12s;
 }
-button:active { transform: scale(.95) !important; opacity: .72 !important; }
+
+/* #7 — hover state so the UI doesn't feel dead */
+button:hover {
+  opacity: 0.88;
+}
+
+/* #3 — removed !important; specificity handles it now */
+button:active {
+  transform: scale(.95);
+  opacity: .72;
+}
 
 /* ════════════════════════════════════════
    SCROLLBAR
 ════════════════════════════════════════ */
-::-webkit-scrollbar       { width: 3px; }
-::-webkit-scrollbar-thumb { background: #ffffff20; border-radius: 4px; }
+/* #6 — 3px was a legal loophole, not a scrollbar */
+::-webkit-scrollbar       { width: 6px; }
+::-webkit-scrollbar-thumb { background: var(--white-soft); border-radius: 4px; }
 
 /* ════════════════════════════════════════
    TOGGLE SWITCH
+   On/off state (background + thumb left)
+   is driven by React inline styles, so
+   no .active class is needed here. CSS
+   owns the shell and the animation.
 ════════════════════════════════════════ */
 .toggle-track {
   width: 44px; height: 26px; border-radius: 99px;
   border: none; cursor: pointer; position: relative;
   transition: background .2s;
 }
+
 .toggle-thumb {
   width: 20px; height: 20px; border-radius: 50%;
   background: #fff; position: absolute; top: 3px;
   transition: left .2s;
   box-shadow: 0 1px 4px rgba(0,0,0,.3);
+
+  /* #4 — GPU hint: browser knows this property will move */
+  will-change: left;
 }
 
 /* ════════════════════════════════════════
@@ -94,5 +167,20 @@ button:active { transform: scale(.95) !important; opacity: .72 !important; }
 .timer-bar-fill {
   height: 100%;
   border-radius: 99px;
-  transition: width 1s linear, background .5s;
+
+  /* #9 — ease-out feels human; linear feels robotic */
+  transition: width 1s ease-out, background .5s;
+
+  /* #4 — GPU hint for animated properties */
+  will-change: width, background;
+}
+
+/* ════════════════════════════════════════
+   GPU HINTS — ANIMATED ELEMENTS
+   Applied only where heavy animations run.
+   Blanket will-change everywhere would
+   hurt more than help.
+════════════════════════════════════════ */
+.animating {
+  will-change: transform, opacity;
 }
