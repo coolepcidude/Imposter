@@ -40,12 +40,12 @@ const MODIFIERS = [
 ];
 
 const QUESTION_PACKS = [
-  { id: 'main',         label: 'Classic',       emoji: '🎲', file: 'questions/Main.json',          desc: 'Everyday questions about you' },
-  { id: 'players',      label: 'About Us',      emoji: '👥', file: 'questions/Players.json',        desc: 'Questions featuring a player in the room', hasPlayer: true },
-  { id: 'hypothetical', label: 'Hypothetical',  emoji: '🤔', file: 'questions/Hypothetical.json',   desc: 'What would you do if…' },
-  { id: 'deep',         label: 'Deep Cuts',     emoji: '💭', file: 'questions/Deep.json',            desc: 'Meaningful & introspective' },
-  { id: 'spicy',        label: 'Spicy',         emoji: '🌶️', file: 'questions/Spicy.json',          desc: 'Unpopular opinions & hot takes — nothing NSFW', notice: 'Not NSFW — just unpopular opinions & takes people might disagree with.' },
-  { id: 'nostalgia',    label: 'Nostalgia',     emoji: '📼', file: 'questions/Nostalgia.json',       desc: 'Childhood memories & throwbacks' },
+  { id: 'main',         label: 'Classic',       emoji: '🎲', file: 'questions/Main.JSON',          desc: 'Everyday questions about you' },
+  { id: 'players',      label: 'About Us',      emoji: '👥', file: 'questions/Players.JSON',        desc: 'Questions featuring a player in the room', hasPlayer: true },
+  { id: 'hypothetical', label: 'Hypothetical',  emoji: '🤔', file: 'questions/Hypothetical.JSON',   desc: 'What would you do if…' },
+  { id: 'deep',         label: 'Deep Cuts',     emoji: '💭', file: 'questions/Deep.JSON',            desc: 'Meaningful & introspective' },
+  { id: 'spicy',        label: 'Spicy',         emoji: '🌶️', file: 'questions/Spicy.JSON',          desc: 'Unpopular opinions & hot takes — nothing NSFW', notice: 'Not NSFW — just unpopular opinions & takes people might disagree with.' },
+  { id: 'nostalgia',    label: 'Nostalgia',     emoji: '📼', file: 'questions/Nostalgia.JSON',       desc: 'Childhood memories & throwbacks' },
 ];
 
 /* ──────────────────────────────────────
@@ -542,7 +542,7 @@ function App() {
       .filter(p => activePacks.includes(p.id))
       .map(p => fetch(p.file).then(r => r.ok ? r.json() : []).catch(() => []));
 
-    const reversePromise = fetch('questions/Reverse.json')
+    const reversePromise = fetch('questions/Reverse.JSON')
       .then(r => r.ok ? r.json() : [])
       .catch(() => []);
 
