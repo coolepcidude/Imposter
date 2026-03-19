@@ -3,6 +3,15 @@
    Pure game logic — no React, no DOM.
    All functions are exposed as globals so app.js can
    call them without a bundler.
+
+   Question format (all packs):
+   { "variants": [ "phrasing A", "phrasing B", … "phrasing J" ] }
+   Every question has exactly 10 variants (A–J).
+
+   Standard modes : group gets variant[i], outlier gets
+                    variant[j] (i ≠ j), both chosen at random.
+   Reverse mode   : two players share variant[0]; every other
+                    player gets a unique remaining variant.
 ════════════════════════════════════════════════════ */
 
 /* ──────────────────────────────────────
@@ -58,13 +67,6 @@ function getVoteTally(votes) {
   return tally;
 }
 
-/**
- * Returns true if the group caught at least one imposter.
- *
- * clueless / undercover : top-voted player is THE imposter.
- * doublecross           : both imposters are in top-2 most voted.
- * reverse               : both twins are in top-2 most voted.
- */
 function checkGroupWon(votes, impNames, mode) {
   const tally  = getVoteTally(votes);
   const sorted = Object.entries(tally).sort((a, b) => b[1] - a[1]);
@@ -72,15 +74,12 @@ function checkGroupWon(votes, impNames, mode) {
   if (mode === 'doublecross' || mode === 'reverse') {
     const top2 = sorted.slice(0, 2).map(e => e[0]);
     return mode === 'reverse'
-      ? impNames.every(n => top2.includes(n))   /* must catch BOTH twins */
-      : impNames.some(n => top2.includes(n));    /* catch at least one imposter */
+      ? impNames.every(n => top2.includes(n))
+      : impNames.some(n => top2.includes(n));
   }
   return impNames.includes(sorted[0]?.[0]);
 }
 
-/**
- * Compute how many points each player earns this round.
- */
 function computeRoundScores(votes, impNames, mode, playerNames) {
   const earned = {};
   playerNames.forEach(n => { earned[n] = 0; });
@@ -101,7 +100,6 @@ function computeRoundScores(votes, impNames, mode, playerNames) {
     });
 
   } else if (mode === 'reverse') {
-    /* +1 for any voter who correctly names a twin */
     playerNames.forEach(voter => {
       if (impNames.includes(votes[voter])) earned[voter]++;
     });
@@ -110,7 +108,6 @@ function computeRoundScores(votes, impNames, mode, playerNames) {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 2)
       .map(e => e[0]);
-    /* +2 each twin who escapes the top-2 */
     impNames.forEach(imp => {
       if (!top2.includes(imp)) earned[imp] = (earned[imp] || 0) + 2;
     });
@@ -132,32 +129,42 @@ function computeRoundScores(votes, impNames, mode, playerNames) {
    ROUND CREATION
 ────────────────────────────────────── */
 
-/**
- * Standard round (clueless / undercover / doublecross).
- *
- * @param {object[]} players   - Array of { id, name, colorIdx }
- * @param {string}   mode      - "clueless" | "undercover" | "doublecross"
- * @param {object[]} questions - Array of { a, b } pairs
- * @param {number[]} used      - Already-used question indices
- * @returns {object}           - Round data spread into state
- */
-function createStandardRound({ players, mode, questions, used }) {
-  const rng = getRNG();
-  const pc  = players.length;
-
-  /* Pick question */
+function pickQuestion(questions, used, rng) {
   const avail     = questions.map((_, i) => i).filter(i => !used.includes(i));
   const isCycling = avail.length === 0;
   const pool      = isCycling ? questions.map((_, i) => i) : avail;
   const pick      = pool[Math.floor(rng() * pool.length)];
   const newUsed   = isCycling ? [pick] : [...used, pick];
+  return { pick, newUsed, isCycling };
+}
 
-  /* Randomise which side is "main" */
-  const raw     = questions[pick];
-  const swapped = rng() < 0.5;
-  const qPair   = swapped ? { a: raw.b, b: raw.a } : { a: raw.a, b: raw.b };
+/**
+ * Standard round (clueless / undercover / doublecross).
+ *
+ * Picks one question at random.  From its 10 variants:
+ *   - Group players all see the same randomly chosen variant.
+ *   - Outlier(s) see a different randomly chosen variant.
+ */
+function createStandardRound({ players, mode, questions, used }) {
+  const rng = getRNG();
+  const pc  = players.length;
 
-  /* Shuffle answer order */
+  const { pick, newUsed, isCycling } = pickQuestion(questions, used, rng);
+  const variants = questions[pick].variants;
+  const vLen     = variants.length;
+
+  /* Pick group variant */
+  const groupIdx = Math.floor(rng() * vLen);
+
+  /* Pick outlier variant — must differ from group */
+  let outlierIdx = Math.floor(rng() * (vLen - 1));
+  if (outlierIdx >= groupIdx) outlierIdx++;
+
+  const qPair = {
+    a: variants[groupIdx],
+    b: variants[outlierIdx],
+  };
+
   const qOrder = shuffleRNG(players.map((_, i) => i));
 
   /* Pick imposter(s) */
@@ -171,10 +178,7 @@ function createStandardRound({ players, mode, questions, used }) {
     impIdxs = [Math.floor(rng() * pc)];
   }
 
-  /* Shuffle vote order */
-  const voteOrder = shuffleRNG(players.map(p => p.name));
-
-  /* Pick a player subject for [Player] substitution */
+  const voteOrder     = shuffleRNG(players.map(p => p.name));
   const playerSubject = players[Math.floor(rng() * pc)].name;
 
   return {
@@ -190,21 +194,17 @@ function createStandardRound({ players, mode, questions, used }) {
 }
 
 /**
- * Reverse round — two players share the same question variant;
+ * Reverse round — two players share the same variant;
  * every other player gets a unique variant.
- *
- * @param {object[]} players   - Array of { id, name, colorIdx }
- * @param {object[]} questions - Array of { variants: string[] } (≥ pc−1 variants each)
- * @param {number[]} used      - Already-used question indices
+ * Voters must identify the matching pair.
  */
 function createReverseRound({ players, questions, used }) {
   const rng = getRNG();
   const pc  = players.length;
 
   if (!questions || questions.length === 0) {
-    /* Fallback: return empty-ish data rather than crashing */
     return {
-      qPair:          { a: '(no reverse questions loaded)', b: '(no reverse questions loaded)' },
+      qPair:          { a: '(no questions loaded)', b: '(no questions loaded)' },
       qOrder:         players.map((_, i) => i),
       impIdxs:        [0, 1],
       voteOrder:      players.map(p => p.name),
@@ -215,13 +215,7 @@ function createReverseRound({ players, questions, used }) {
     };
   }
 
-  /* Pick question */
-  const avail     = questions.map((_, i) => i).filter(i => !used.includes(i));
-  const isCycling = avail.length === 0;
-  const pool      = isCycling ? questions.map((_, i) => i) : avail;
-  const pick      = pool[Math.floor(rng() * pool.length)];
-  const newUsed   = isCycling ? [pick] : [...used, pick];
-
+  const { pick, newUsed, isCycling } = pickQuestion(questions, used, rng);
   const variants = questions[pick].variants;
 
   /* Pick 2 twin indices */
@@ -230,7 +224,7 @@ function createReverseRound({ players, questions, used }) {
   if (i2 >= i1) i2++;
   const twinIdxs = [i1, i2];
 
-  /* Assign variants */
+  /* Assign variants — twins share variants[0], others get unique variants */
   const shuffled       = shuffleRNG(players.map((_, i) => i));
   const playerVariants = {};
   let   variantOffset  = 1;
@@ -238,19 +232,19 @@ function createReverseRound({ players, questions, used }) {
   shuffled.forEach(idx => {
     const name = players[idx].name;
     if (twinIdxs.includes(idx)) {
-      playerVariants[name] = variants[0];                              /* shared */
+      playerVariants[name] = variants[0];
     } else {
-      playerVariants[name] = variants[variantOffset] ?? variants[0];  /* unique */
+      playerVariants[name] = variants[variantOffset] ?? variants[0];
       variantOffset++;
     }
   });
 
-  const qOrder     = shuffleRNG(players.map((_, i) => i));
-  const voteOrder  = shuffleRNG(players.map(p => p.name));
+  const qOrder        = shuffleRNG(players.map((_, i) => i));
+  const voteOrder     = shuffleRNG(players.map(p => p.name));
   const playerSubject = players[Math.floor(rng() * pc)].name;
 
   return {
-    qPair:          { a: variants[0], b: variants[0] }, /* shared q used in reveal */
+    qPair:          { a: variants[0], b: variants[0] },
     qOrder,
     impIdxs:        twinIdxs,
     voteOrder,
@@ -262,11 +256,12 @@ function createReverseRound({ players, questions, used }) {
 }
 
 /**
- * Unified entry point — dispatches to the right creator based on mode.
+ * Unified entry point.
+ * All packs use { variants: string[] } format — no separate reverseQuestions needed.
  */
-function createRound({ players, mode, questions, reverseQuestions, used }) {
+function createRound({ players, mode, questions, used }) {
   if (mode === 'reverse') {
-    return createReverseRound({ players, questions: reverseQuestions, used });
+    return createReverseRound({ players, questions, used });
   }
   return createStandardRound({ players, mode, questions, used });
 }
