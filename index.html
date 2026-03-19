@@ -1,22 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
   <title>Imposter</title>
+  <link rel="stylesheet" href="style.css"/>
 
-  <!-- Styles -->
-  <link rel="stylesheet" href="style.css" />
-
-  <!-- React + Babel (needed for JSX in app.js) -->
+  <!-- React + Babel (needed because app.js uses JSX) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+
+  <!-- Plain JS modules (no JSX — loaded as regular scripts) -->
+  <script src="gameEngine.js"></script>
+  <script src="sounds.js"></script>
 </head>
 <body>
   <div id="root"></div>
 
-  <!-- App logic -->
+  <!-- React app — must be text/babel because it contains JSX -->
   <script type="text/babel" src="app.js"></script>
 </body>
 </html>
