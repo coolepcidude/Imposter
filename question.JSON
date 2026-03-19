@@ -1,4 +1,55 @@
 [
+  { "a": "What do you usually eat for breakfast?",                          "b": "What do you grab when you need a quick morning meal?" },
+  { "a": "What food do you crave late at night?",                           "b": "What do you end up eating when you shouldn't be?" },
+  { "a": "What’s your comfort food?",                                       "b": "What food makes you feel better instantly?" },
+  { "a": "What restaurant do you go to the most?",                          "b": "Where do you default to when you can't decide where to eat?" },
+  { "a": "What drink do you order at a café?",                              "b": "What’s your usual coffee shop order?" },
+
+  { "a": "What place would you visit again without hesitation?",            "b": "What trip would you happily repeat?" },
+  { "a": "What type of vacation do you prefer?",                            "b": "What kind of trip actually relaxes you?" },
+  { "a": "What country’s food do you like the most?",                       "b": "What cuisine do you always gravitate toward?" },
+
+  { "a": "Who do you laugh the most with?",                                 "b": "Who always makes you laugh no matter what?" },
+  { "a": "Who would you trust with a big secret?",                          "b": "Who would you go to if something serious happened?" },
+  { "a": "Who do you spend the most time with?",                            "b": "Who are you usually with when you're not alone?" },
+
+  { "a": "What movie genre do you like the most?",                          "b": "What kind of movies do you usually pick?" },
+  { "a": "What show are you currently into?",                               "b": "What series are you watching right now?" },
+  { "a": "What movie have you watched recently?",                           "b": "What’s the last movie you remember watching?" },
+
+  { "a": "What song do you know all the words to?",                         "b": "What song could you sing without thinking?" },
+  { "a": "What genre of music do you listen to the most?",                  "b": "What type of music is usually in your playlists?" },
+  { "a": "What artist would you see live if you had the chance?",           "b": "Who would you buy concert tickets for immediately?" },
+
+  { "a": "What subject do you find the most interesting?",                  "b": "What topic do you enjoy learning about the most?" },
+  { "a": "What subject do you find the easiest?",                           "b": "What class comes naturally to you?" },
+
+  { "a": "What animal do you like the most?",                               "b": "What animal would you want as a pet?" },
+  { "a": "What animal do you think is the coolest?",                        "b": "What animal do you find the most impressive?" },
+
+  { "a": "What would you do first if you won the lottery?",                 "b": "What’s the first thing you'd spend money on if you were rich?" },
+  { "a": "What would you buy if money didn’t matter?",                      "b": "What’s something expensive you’ve always wanted?" },
+
+  { "a": "What game do you play when you're bored?",                        "b": "What game do you open when you have nothing to do?" },
+  { "a": "What kind of games do you enjoy the most?",                       "b": "What type of games do you usually play?" },
+
+  { "a": "What time do you usually go to bed?",                             "b": "When do you actually fall asleep most nights?" },
+  { "a": "What’s the first thing you do when you wake up?",                 "b": "What’s your usual morning routine starting point?" },
+
+  { "a": "What social media do you use the most?",                          "b": "What app do you check the most during the day?" },
+  { "a": "What kind of posts do you like the most?",                        "b": "What content do you usually interact with?" },
+
+  { "a": "What stresses you out the most?",                                 "b": "What situation makes you feel the most pressure?" },
+  { "a": "What helps you relax?",                                           "b": "What do you do to calm down?" },
+
+  { "a": "What kind of people do you get along with best?",                 "b": "What personality type do you usually click with?" },
+  { "a": "What annoys you quickly in people?",                              "b": "What trait do you find hard to tolerate?" },
+
+  { "a": "What kind of weather do you enjoy the most?",                     "b": "What weather would you choose every day if you could?" },
+  { "a": "What season do you like best?",                                   "b": "What time of year do you enjoy the most?" },
+
+  { "a": "What’s your favorite way to spend time alone?",                   "b": "What do you usually do when you have time to yourself?" },
+  { "a": "What’s your favorite way to spend time with friends?",            "b": "What do you usually do when you hang out with people?" }
   { "a": "What's your go-to takeaway order?",                               "b": "What's the first thing you'd eat after a long flight?" },
   { "a": "What food do you always go back for seconds of?",                  "b": "What food do you make sure to eat at every party?" },
   { "a": "What's the one food you could never give up?",                     "b": "What food would you request for your birthday dinner?" },
