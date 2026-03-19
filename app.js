@@ -1,6 +1,6 @@
 /* ════════════════════════════════════════════════════
    app.js
-   React UI for Imposter Party Game.
+   React UI for Outlier Party Game.
    Depends on globals: React, ReactDOM, Babel,
                        gameEngine.js, sounds.js
 ════════════════════════════════════════════════════ */
@@ -832,7 +832,7 @@ function App() {
               backgroundSize: '200% auto',
               WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
               animation: 'shimmer 4s linear infinite',
-            }}>IMPOSTER</h1>
+            }}>OUTLIER</h1>
             <p style={{ color: '#ffffff38', fontSize: 10, letterSpacing: 6, textTransform: 'uppercase', marginTop: 6, fontWeight: 800 }}>
               Party Game · 2–10 Players
             </p>
