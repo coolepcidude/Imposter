@@ -46,7 +46,53 @@ const QUESTION_PACKS = [
   { id: 'deep',         label: 'Deep Cuts',     emoji: '💭', file: 'questions/Deep.JSON',            desc: 'Meaningful & introspective' },
   { id: 'spicy',        label: 'Spicy',         emoji: '🌶️', file: 'questions/Spicy.JSON',          desc: 'Unpopular opinions & hot takes — nothing NSFW', notice: 'Not NSFW — just unpopular opinions & takes people might disagree with.' },
   { id: 'nostalgia',    label: 'Nostalgia',     emoji: '📼', file: 'questions/Nostalgia.JSON',       desc: 'Childhood memories & throwbacks' },
+  { id: 'numbers',      label: 'Numbers',       emoji: '🔢', file: 'questions/Numbers.JSON',         desc: 'All answers are numbers' },
+  { id: 'sentences',    label: 'Sentences',     emoji: '✏️', file: 'questions/Sentences.JSON',       desc: 'Complete the sentence' },
 ];
+
+const ANSWER_CHAR_LIMIT = 80;
+
+/* ──────────────────────────────────────
+   HAPTIC UTILITY
+────────────────────────────────────── */
+function haptic(pattern) {
+  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (_) {}
+}
+
+/* ──────────────────────────────────────
+   CANVAS HELPERS  (for round summary card)
+────────────────────────────────────── */
+function ctxWrapText(ctx, text, x, y, maxWidth, lineHeight) {
+  const words = text.split(' ');
+  let line = '';
+  let curY = y;
+  for (const word of words) {
+    const test = line ? line + ' ' + word : word;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      ctx.fillText(line, x, curY);
+      line = word;
+      curY += lineHeight;
+    } else {
+      line = test;
+    }
+  }
+  if (line) { ctx.fillText(line, x, curY); curY += lineHeight; }
+  return curY;
+}
+
+function ctxRoundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
 
 /* ──────────────────────────────────────
    INITIAL STATE
@@ -238,7 +284,6 @@ function reducer(state, action) {
    STYLE TOKENS
 ────────────────────────────────────── */
 const T = {
-  /* Colours */
   bg:        '#070810',
   surface:   'rgba(255,255,255,0.03)',
   border:    'rgba(255,255,255,0.07)',
@@ -246,7 +291,6 @@ const T = {
   text:      '#F0F4FF',
   textMid:   'rgba(240,244,255,0.55)',
   textDim:   'rgba(240,244,255,0.28)',
-  /* Radii */
   r:  16,
   rl: 22,
   rx: 28,
@@ -403,7 +447,6 @@ const BlobBG = memo(function BlobBG({ accent = '#6366F1' }) {
       <div style={{ position: 'absolute', top: '-25%', left: '-10%', width: '65vw', height: '65vw', borderRadius: '50%', background: `radial-gradient(circle, ${accent}18 0%, transparent 68%)`, animation: 'drift1 14s ease-in-out infinite', transition: 'background 1.4s' }} />
       <div style={{ position: 'absolute', bottom: '-20%', right: '-8%',  width: '55vw', height: '55vw', borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 68%)',  animation: 'drift2 18s ease-in-out infinite' }} />
       <div style={{ position: 'absolute', top: '45%',   right: '5%',     width: '40vw', height: '40vw', borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 68%)',   animation: 'drift3 12s ease-in-out infinite' }} />
-      {/* Fine grid overlay */}
       <div style={{ position: 'absolute', inset: 0, opacity: 0.018, backgroundImage: 'linear-gradient(rgba(255,255,255,.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.6) 1px, transparent 1px)', backgroundSize: '44px 44px' }} />
     </div>
   );
@@ -491,7 +534,7 @@ const PBtn = memo(function PBtn({ col, ghost, sm, dis, onClick, children }) {
   return <button onClick={onClick} disabled={dis} style={D.btn(col, ghost, sm, dis)}>{children}</button>;
 });
 
-/* Modifier pill banner shown during question phase */
+/* Modifier pill banner */
 const ModifierBanner = memo(function ModifierBanner({ modifiers }) {
   if (!modifiers || modifiers.length === 0) return null;
   return (
@@ -509,6 +552,230 @@ const ModifierBanner = memo(function ModifierBanner({ modifiers }) {
   );
 });
 
+/* ── Round Summary Card ─────────────────────────────── */
+const RoundSummaryCard = memo(function RoundSummaryCard({
+  round, totalRounds, groupWon, impNames, qPair, answers, players, mode,
+}) {
+  const canvasRef = useRef(null);
+  const isReverse = mode === 'reverse';
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !qPair) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const W   = 600;
+    const PAD = 30;
+
+    // Estimate height: header + outlier section + group section + answers + footer
+    const answerRows = Math.ceil(players.length / 2);
+    const H = Math.max(460, 310 + impNames.length * 44 + answerRows * 30 + 50);
+
+    canvas.width        = W * dpr;
+    canvas.height       = H * dpr;
+    canvas.style.width  = W + 'px';
+    canvas.style.height = H + 'px';
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    const impColor = groupWon ? '#34D399' : '#FF6B6B';
+    const ACCENT   = '#818CF8';
+    const TEXT     = '#F0F4FF';
+    const MID      = 'rgba(240,244,255,0.55)';
+    const DIM      = 'rgba(240,244,255,0.28)';
+
+    // Background
+    ctx.fillStyle = '#0B0D1B';
+    ctx.fillRect(0, 0, W, H);
+
+    // Ambient glow
+    const grd = ctx.createRadialGradient(W * 0.18, H * 0.22, 0, W * 0.18, H * 0.22, W * 0.65);
+    grd.addColorStop(0, 'rgba(99,102,241,0.13)');
+    grd.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, W, H);
+
+    // Card border
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth   = 1;
+    ctxRoundRect(ctx, 0.5, 0.5, W - 1, H - 1, 18);
+    ctx.stroke();
+
+    let y = PAD + 14;
+
+    // ── Header ─────────────────────────────────────
+    ctx.font      = '800 20px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = ACCENT;
+    ctx.fillText('OUTLIER', PAD, y);
+
+    const roundStr = `Round ${round} of ${totalRounds}`;
+    ctx.font      = '700 11px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = DIM;
+    ctx.fillText(roundStr, W - PAD - ctx.measureText(roundStr).width, y);
+
+    const modeNames = { clueless: 'Clueless', undercover: 'Undercover', doublecross: 'Double Cross', reverse: 'Reverse' };
+    ctx.font      = '600 10px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = 'rgba(240,244,255,0.2)';
+    ctx.fillText(modeNames[mode] || mode, PAD, y + 17);
+
+    y += 38;
+
+    // Divider
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+    ctx.lineWidth   = 1;
+    ctx.beginPath(); ctx.moveTo(PAD, y); ctx.lineTo(W - PAD, y); ctx.stroke();
+    y += 18;
+
+    // ── Outlier section ────────────────────────────
+    ctx.font      = '700 9px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = DIM;
+    ctx.fillText(isReverse ? 'THE MATCHING PAIR' : impNames.length > 1 ? 'THE OUTLIERS' : 'THE OUTLIER', PAD, y);
+    y += 20;
+
+    // Name
+    ctx.font      = '800 24px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = impColor;
+    ctx.fillText(impNames.join(' & '), PAD, y);
+
+    // Outcome badge (right-aligned)
+    const outLabel = isReverse
+      ? (groupWon ? 'IDENTIFIED' : 'ESCAPED')
+      : (groupWon ? 'CAUGHT' : 'ESCAPED');
+    ctx.font = '800 10px system-ui, -apple-system, sans-serif';
+    const bW = ctx.measureText(outLabel).width + 18;
+    const bH = 22;
+    const bX = W - PAD - bW;
+    const bY = y - 18;
+    ctx.fillStyle   = groupWon ? 'rgba(52,211,153,0.14)' : 'rgba(255,107,107,0.14)';
+    ctxRoundRect(ctx, bX, bY, bW, bH, 6); ctx.fill();
+    ctx.strokeStyle = groupWon ? 'rgba(52,211,153,0.45)' : 'rgba(255,107,107,0.45)';
+    ctx.lineWidth   = 1;
+    ctxRoundRect(ctx, bX, bY, bW, bH, 6); ctx.stroke();
+    ctx.fillStyle   = impColor;
+    ctx.fillText(outLabel, bX + 9, bY + 15);
+
+    y += 14;
+
+    // Their question
+    ctx.font      = '600 9px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = DIM;
+    ctx.fillText('THEIR QUESTION', PAD, y);
+    y += 16;
+
+    ctx.font      = 'italic 12px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = MID;
+    y = ctxWrapText(ctx, `"${qPair.b}"`, PAD + 4, y, W - PAD * 2 - 8, 18);
+    y += 4;
+
+    // Their answers
+    impNames.forEach(name => {
+      const ans = answers[name];
+      if (!ans || ans === '…') return;
+      ctx.font      = '700 9px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = DIM;
+      ctx.fillText(`${name.toUpperCase()}'S ANSWER`, PAD, y);
+      y += 16;
+      ctx.font      = '700 13px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = impColor;
+      const shortAns = ans.length > 60 ? ans.slice(0, 60) + '…' : ans;
+      y = ctxWrapText(ctx, `"${shortAns}"`, PAD + 4, y, W - PAD * 2 - 8, 18);
+      y += 6;
+    });
+
+    y += 4;
+
+    // Divider
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+    ctx.lineWidth   = 1;
+    ctx.beginPath(); ctx.moveTo(PAD, y); ctx.lineTo(W - PAD, y); ctx.stroke();
+    y += 16;
+
+    // ── Group question ─────────────────────────────
+    if (!isReverse) {
+      ctx.font      = '700 9px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = DIM;
+      ctx.fillText('EVERYONE ELSE GOT', PAD, y);
+      y += 16;
+
+      ctx.font      = 'italic 12px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = MID;
+      y = ctxWrapText(ctx, `"${qPair.a}"`, PAD + 4, y, W - PAD * 2 - 8, 18);
+      y += 10;
+    }
+
+    // ── All answers grid ───────────────────────────
+    ctx.font      = '700 9px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = DIM;
+    ctx.fillText('ALL ANSWERS', PAD, y);
+    y += 14;
+
+    const col1X = PAD;
+    const col2X = W / 2 + 6;
+    let   col   = 0;
+    let   baseY = y;
+
+    players.forEach((p) => {
+      const isImp = impNames.includes(p.name);
+      const ans   = answers[p.name] || '…';
+      const xPos  = col % 2 === 0 ? col1X : col2X;
+      const rowY  = baseY + Math.floor(col / 2) * 30;
+      const dotColor = isImp ? impColor : (COLORS[p.colorIdx % COLORS.length]);
+
+      // Dot
+      ctx.beginPath();
+      ctx.arc(xPos + 5, rowY - 3, 4, 0, Math.PI * 2);
+      ctx.fillStyle = dotColor;
+      ctx.fill();
+
+      // Name
+      ctx.font      = '700 11px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = isImp ? impColor : TEXT;
+      ctx.fillText(p.name, xPos + 15, rowY);
+
+      // Answer
+      ctx.font      = '11px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = isImp ? `${impColor}bb` : MID;
+      const shortA = ans.length > 22 ? ans.slice(0, 22) + '…' : ans;
+      ctx.fillText(`"${shortA}"`, xPos + 15, rowY + 14);
+
+      col++;
+    });
+
+    y = baseY + Math.ceil(players.length / 2) * 30 + 10;
+
+    // ── Footer ─────────────────────────────────────
+    ctx.font      = '600 9px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = 'rgba(240,244,255,0.13)';
+    ctx.fillText('outlier · pass-the-phone party game', PAD, H - 14);
+
+  }, [round, totalRounds, groupWon, impNames, qPair, answers, players, mode]);
+
+  const handleDownload = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    haptic([30, 20, 50]);
+    SoundEngine.click();
+    const a = document.createElement('a');
+    a.download = `outlier-round-${round}.png`;
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  }, [round]);
+
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <p style={S.lbl}>Round Card</p>
+      <canvas
+        ref={canvasRef}
+        style={{ width: '100%', borderRadius: 14, display: 'block', border: `1px solid ${T.border}` }}
+      />
+      <button onClick={handleDownload} style={{ ...D.btn('#818CF8', true, true), marginTop: 10 }}>
+        ↓ Save as Image
+      </button>
+    </div>
+  );
+});
+
 /* ──────────────────────────────────────
    MAIN APP
 ────────────────────────────────────── */
@@ -516,22 +783,43 @@ function App() {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
 
   /* Question packs */
-  const [activePacks,   setActivePacks]   = useState(['main']);
-  const [qs,            setQs]            = useState([]);
-  const [reverseQs,     setReverseQs]     = useState([]);
-  const [qLoading,      setQLoading]      = useState(true);
-  const [qError,        setQError]        = useState(false);
+  const [activePacks, setActivePacks] = useState(['main']);
+  const [qs,          setQs]          = useState([]);
+  const [reverseQs,   setReverseQs]   = useState([]);
+  const [qLoading,    setQLoading]    = useState(true);
+  const [qError,      setQError]      = useState(false);
+
+  /* Custom questions — persisted in localStorage */
+  const [customQuestions, setCustomQuestions] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('outlier_custom_qs') || '[]'); }
+    catch { return []; }
+  });
+  const [customDraftA,     setCustomDraftA]     = useState('');
+  const [customDraftB,     setCustomDraftB]     = useState('');
+  const [showCustomEditor, setShowCustomEditor] = useState(false);
 
   /* Modifiers */
   const [activeModifiers, setActiveModifiers] = useState([]);
 
   /* Timer */
-  const [timeLeft,    setTimeLeft]    = useState(30);
-  const timerRef     = useRef(null);
-  const submittedRef = useRef(false);
+  const [timeLeft,  setTimeLeft]  = useState(30);
+  const timerRef                  = useRef(null);
+  const submittedRef              = useRef(false);
 
   /* Sound */
   const [soundOn, setSoundOn] = useState(true);
+
+  /* ── Persist custom questions & clean up activePacks ── */
+  useEffect(() => {
+    localStorage.setItem('outlier_custom_qs', JSON.stringify(customQuestions));
+    if (customQuestions.length === 0) {
+      setActivePacks(prev => {
+        if (!prev.includes('custom')) return prev;
+        const without = prev.filter(id => id !== 'custom');
+        return without.length > 0 ? without : ['main'];
+      });
+    }
+  }, [customQuestions]);
 
   /* ── Load questions ── */
   useEffect(() => {
@@ -548,18 +836,23 @@ function App() {
 
     Promise.all([...packPromises, reversePromise])
       .then(results => {
-        const reversed  = results.pop();
-        const combined  = results.flat();
+        const reversed   = results.pop();
+        const fromFiles  = results.flat();
+        const combined   = activePacks.includes('custom')
+          ? [...fromFiles, ...customQuestions]
+          : fromFiles;
         setReverseQs(reversed);
-        if (combined.length === 0 && activePacks.length > 0) {
+        const filePackSelected = activePacks.some(id => QUESTION_PACKS.find(p => p.id === id));
+        if (fromFiles.length === 0 && filePackSelected) {
           setQError(true);
         } else {
           setQs(combined);
+          setQError(false);
         }
         setQLoading(false);
       })
       .catch(() => { setQError(true); setQLoading(false); });
-  }, [activePacks]);
+  }, [activePacks, customQuestions]);
 
   /* ── Timer countdown ── */
   useEffect(() => {
@@ -575,12 +868,13 @@ function App() {
           if (!submittedRef.current) {
             submittedRef.current = true;
             SoundEngine.timerEnd();
+            haptic([150, 80, 80]);
             dispatch({ type: 'SUBMIT_ANSWER' });
           }
           return 0;
         }
-        if (next <= 3)      SoundEngine.timerWarn();
-        else if (next <= 5) SoundEngine.tick();
+        if (next <= 3)      { SoundEngine.timerWarn(); haptic(40); }
+        else if (next <= 5) { SoundEngine.tick(); haptic(20); }
         return next;
       });
     }, 1000);
@@ -597,9 +891,10 @@ function App() {
     }
     if (state.revealStage === 1) {
       SoundEngine.reveal();
+      haptic([80, 40, 80, 40, 200]);
       setTimeout(() => {
-        if (state.groupWon) { SoundEngine.win();  dispatch({ type: 'SET_CONFETTI', value: true }); }
-        else                { SoundEngine.lose(); }
+        if (state.groupWon) { SoundEngine.win();  haptic([50,30,50,30,50,30,150]); dispatch({ type: 'SET_CONFETTI', value: true }); }
+        else                { SoundEngine.lose(); haptic([200, 100, 100]); }
       }, 500);
       const t = setTimeout(() => dispatch({ type: 'SET_REVEAL_STAGE', stage: 2 }), 2300);
       return () => clearTimeout(t);
@@ -616,40 +911,33 @@ function App() {
   const mInfo         = MODES.find(m => m.id === state.mode) || MODES[0];
   const activeModInfo = MODIFIERS.filter(m => activeModifiers.includes(m.id));
 
-  /* Answering phase */
   const curAnsPlayer = state.players[state.qOrder[state.curAns]];
   const curAnsName   = curAnsPlayer?.name || '';
   const curIsImp     = state.impIdxs.includes(state.qOrder[state.curAns]);
   const curAnsColor  = COLORS[curAnsPlayer?.colorIdx ?? (state.curAns % COLORS.length)];
 
-  /* Resolve current question */
   let curQ = '';
   if (state.playerVariants) {
     curQ = state.playerVariants[curAnsName] || '';
   } else if (state.qPair) {
     curQ = curIsImp ? state.qPair.b : state.qPair.a;
   }
-  /* Substitute [Player] with the chosen subject */
   if (state.playerSubject) curQ = curQ.replace(/\[Player\]/g, state.playerSubject);
 
-  /* Voting phase */
-  const voterName       = state.voteOrder[state.curVoter];
-  const voterPlayer     = state.players.find(p => p.name === voterName);
-  const voteAccent      = COLORS[(voterPlayer?.colorIdx ?? 0) % COLORS.length];
-  const curVoterPicks   = state.votes[voterName] || (state.mode === 'doublecross' ? [] : null);
+  const voterName     = state.voteOrder[state.curVoter];
+  const voterPlayer   = state.players.find(p => p.name === voterName);
+  const voteAccent    = COLORS[(voterPlayer?.colorIdx ?? 0) % COLORS.length];
+  const curVoterPicks = state.votes[voterName] || (state.mode === 'doublecross' ? [] : null);
 
-  /* Reveal phase */
-  const impNames = state.impIdxs.map(i => state.players[i]?.name).filter(Boolean);
-  const groupWon = state.groupWon;
+  const impNames  = state.impIdxs.map(i => state.players[i]?.name).filter(Boolean);
+  const groupWon  = state.groupWon;
   const isReverse = state.mode === 'reverse';
 
-  /* Background blob accent */
   const accentColor =
-    ['q_handoff', 'question'].includes(state.phase)    ? curAnsColor  :
-    ['vote_handoff', 'vote_cast'].includes(state.phase) ? voteAccent :
+    ['q_handoff', 'question'].includes(state.phase)     ? curAnsColor :
+    ['vote_handoff', 'vote_cast'].includes(state.phase)  ? voteAccent  :
     mInfo.color;
 
-  /* Can start the game? */
   const enoughQs = state.mode === 'reverse'
     ? reverseQs.length > 0
     : qs.length > 0;
@@ -658,11 +946,17 @@ function App() {
     (state.mode !== 'doublecross' || validPlayers.length >= 3) &&
     enoughQs;
 
+  /* character counter colour */
+  const charCount   = state.writing.length;
+  const charWarn    = charCount >= ANSWER_CHAR_LIMIT;
+  const charNear    = charCount >= Math.floor(ANSWER_CHAR_LIMIT * 0.85);
+  const charColor   = charWarn ? '#FF6B6B' : charNear ? '#FF9F45' : T.textDim;
+
   /* ── Handlers ── */
   const togglePack = useCallback((id) => {
     setActivePacks(prev =>
       prev.includes(id)
-        ? prev.length > 1 ? prev.filter(x => x !== id) : prev  /* keep at least one */
+        ? prev.length > 1 ? prev.filter(x => x !== id) : prev
         : [...prev, id]
     );
   }, []);
@@ -671,6 +965,23 @@ function App() {
     setActiveModifiers(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
+  }, []);
+
+  const handleAddCustomQuestion = useCallback(() => {
+    if (!customDraftA.trim() || !customDraftB.trim()) return;
+    haptic(30);
+    SoundEngine.click();
+    setCustomQuestions(prev => [...prev, { a: customDraftA.trim(), b: customDraftB.trim() }]);
+    setCustomDraftA('');
+    setCustomDraftB('');
+    // Auto-enable the custom pack if it isn't already
+    setActivePacks(prev => prev.includes('custom') ? prev : [...prev, 'custom']);
+  }, [customDraftA, customDraftB]);
+
+  const handleDeleteCustomQuestion = useCallback((index) => {
+    haptic(20);
+    SoundEngine.click();
+    setCustomQuestions(prev => prev.filter((_, i) => i !== index));
   }, []);
 
   const handleBeginGame = useCallback(() => {
@@ -684,13 +995,14 @@ function App() {
       return;
     }
 
+    haptic([40, 20, 80]);
     resetRNG();
     const roundData = createRound({
-      players:         valid,
-      mode:            state.mode,
-      questions:       qs,
+      players:          valid,
+      mode:             state.mode,
+      questions:        qs,
       reverseQuestions: reverseQs,
-      used:            [],
+      used:             [],
     });
     dispatch({ type: 'BEGIN_GAME', validPlayers: valid, roundData });
     SoundEngine.click();
@@ -699,21 +1011,25 @@ function App() {
   const handleSubmitAnswer = useCallback(() => {
     submittedRef.current = true;
     clearInterval(timerRef.current);
+    haptic([40, 30, 40]);
     SoundEngine.submit();
     dispatch({ type: 'SUBMIT_ANSWER' });
   }, []);
 
   const handleCastVote = useCallback((suspect) => {
+    haptic(25);
     SoundEngine.vote();
     dispatch({ type: 'CAST_VOTE', suspect });
   }, []);
 
   const handleConfirmVote = useCallback(() => {
+    haptic(35);
     SoundEngine.click();
     dispatch({ type: 'CONFIRM_VOTE' });
   }, []);
 
   const handleNextRound = useCallback(() => {
+    haptic(30);
     SoundEngine.click();
     if (state.round >= state.totalRounds) { dispatch({ type: 'GO_FINAL' }); return; }
     const roundData = createRound({
@@ -729,14 +1045,17 @@ function App() {
   const handleToggleSound = useCallback(() => {
     const next = SoundEngine.toggle();
     setSoundOn(next);
+    haptic(20);
   }, []);
 
   const handleShowQuestion = useCallback(() => {
+    haptic(30);
     SoundEngine.click();
     dispatch({ type: 'SET_PHASE', phase: 'question' });
   }, []);
 
   const handleShowVote = useCallback(() => {
+    haptic(30);
     SoundEngine.click();
     dispatch({ type: 'SET_PHASE', phase: 'vote_cast' });
   }, []);
@@ -792,7 +1111,7 @@ function App() {
             {MODES.map(m => {
               const sel = state.mode === m.id;
               return (
-                <button key={m.id} onClick={() => { SoundEngine.click(); dispatch({ type: 'SET_MODE', mode: m.id }); }} style={D.modePill(m.color, sel)}>
+                <button key={m.id} onClick={() => { SoundEngine.click(); haptic(20); dispatch({ type: 'SET_MODE', mode: m.id }); }} style={D.modePill(m.color, sel)}>
                   <span style={{ fontSize: 26, flexShrink: 0 }}>{m.emoji}</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
@@ -813,7 +1132,7 @@ function App() {
             {[3, 5, 7, 10].map(n => {
               const sel = state.totalRounds === n;
               return (
-                <button key={n} onClick={() => { SoundEngine.click(); dispatch({ type: 'SET_ROUNDS', rounds: n }); }} style={{ flex: 1, padding: '13px 4px', borderRadius: 12, fontWeight: 900, fontSize: 16, border: `1px solid ${sel ? '#C084FC55' : T.border}`, background: sel ? 'rgba(192,132,252,0.12)' : T.surface, color: sel ? '#C084FC' : T.textMid, boxShadow: sel ? '0 0 0 1px rgba(192,132,252,0.2)' : 'none', transition: 'all .18s', fontFamily: 'inherit', cursor: 'pointer' }}>{n}</button>
+                <button key={n} onClick={() => { SoundEngine.click(); haptic(15); dispatch({ type: 'SET_ROUNDS', rounds: n }); }} style={{ flex: 1, padding: '13px 4px', borderRadius: 12, fontWeight: 900, fontSize: 16, border: `1px solid ${sel ? '#C084FC55' : T.border}`, background: sel ? 'rgba(192,132,252,0.12)' : T.surface, color: sel ? '#C084FC' : T.textMid, boxShadow: sel ? '0 0 0 1px rgba(192,132,252,0.2)' : 'none', transition: 'all .18s', fontFamily: 'inherit', cursor: 'pointer' }}>{n}</button>
               );
             })}
           </div>
@@ -835,7 +1154,7 @@ function App() {
                   })}
                 </div>
               )}
-              <button className="toggle-track" onClick={() => dispatch({ type: 'TOGGLE_TIMER' })} style={{ background: state.timerEnabled ? '#FF9F45' : 'rgba(255,255,255,0.12)' }}>
+              <button className="toggle-track" onClick={() => { haptic(20); dispatch({ type: 'TOGGLE_TIMER' }); }} style={{ background: state.timerEnabled ? '#FF9F45' : 'rgba(255,255,255,0.12)' }}>
                 <div className="toggle-thumb" style={{ left: state.timerEnabled ? 21 : 3 }} />
               </button>
             </div>
@@ -847,7 +1166,7 @@ function App() {
             {MODIFIERS.map(mod => {
               const active = activeModifiers.includes(mod.id);
               return (
-                <button key={mod.id} onClick={() => toggleModifier(mod.id)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 99, border: `1px solid ${active ? 'rgba(251,191,36,0.4)' : T.border}`, background: active ? 'rgba(251,191,36,0.1)' : T.surface, color: active ? '#FBBF24' : T.textMid, fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', transition: 'all .18s' }}>
+                <button key={mod.id} onClick={() => { haptic(15); toggleModifier(mod.id); }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 99, border: `1px solid ${active ? 'rgba(251,191,36,0.4)' : T.border}`, background: active ? 'rgba(251,191,36,0.1)' : T.surface, color: active ? '#FBBF24' : T.textMid, fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', transition: 'all .18s' }}>
                   <span>{mod.emoji}</span><span>{mod.label}</span>
                 </button>
               );
@@ -858,11 +1177,11 @@ function App() {
           <p style={S.lbl}>Question Packs</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 22 }}>
             {QUESTION_PACKS.map(pack => {
-              const active = activePacks.includes(pack.id);
+              const active    = activePacks.includes(pack.id);
               const isOnlyOne = activePacks.length === 1 && active;
               return (
                 <React.Fragment key={pack.id}>
-                  <button onClick={() => { if (!isOnlyOne) togglePack(pack.id); }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderRadius: pack.notice && active ? `${T.r}px ${T.r}px 0 0` : T.r, border: `1px solid ${active ? 'rgba(77,166,255,0.35)' : T.border}`, borderBottom: pack.notice && active ? 'none' : undefined, background: active ? 'rgba(77,166,255,0.08)' : T.surface, textAlign: 'left', width: '100%', fontFamily: 'inherit', cursor: isOnlyOne ? 'default' : 'pointer', opacity: isOnlyOne ? 0.7 : 1, transition: 'all .18s' }}>
+                  <button onClick={() => { if (!isOnlyOne) { haptic(15); togglePack(pack.id); } }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderRadius: pack.notice && active ? `${T.r}px ${T.r}px 0 0` : T.r, border: `1px solid ${active ? 'rgba(77,166,255,0.35)' : T.border}`, borderBottom: pack.notice && active ? 'none' : undefined, background: active ? 'rgba(77,166,255,0.08)' : T.surface, textAlign: 'left', width: '100%', fontFamily: 'inherit', cursor: isOnlyOne ? 'default' : 'pointer', opacity: isOnlyOne ? 0.7 : 1, transition: 'all .18s' }}>
                     <span style={{ fontSize: 22, flexShrink: 0 }}>{pack.emoji}</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 800, color: active ? '#4DA6FF' : T.text, marginBottom: 2 }}>{pack.label}</div>
@@ -878,9 +1197,97 @@ function App() {
                 </React.Fragment>
               );
             })}
+
+            {/* Custom pack toggle — only shows when there are custom questions */}
+            {customQuestions.length > 0 && (() => {
+              const active    = activePacks.includes('custom');
+              const isOnlyOne = activePacks.length === 1 && active;
+              return (
+                <button onClick={() => { if (!isOnlyOne) { haptic(15); togglePack('custom'); } }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderRadius: T.r, border: `1px solid ${active ? 'rgba(192,132,252,0.35)' : T.border}`, background: active ? 'rgba(192,132,252,0.08)' : T.surface, textAlign: 'left', width: '100%', fontFamily: 'inherit', cursor: isOnlyOne ? 'default' : 'pointer', opacity: isOnlyOne ? 0.7 : 1, transition: 'all .18s' }}>
+                  <span style={{ fontSize: 22, flexShrink: 0 }}>✏️</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: active ? '#C084FC' : T.text, marginBottom: 2 }}>Custom</div>
+                    <div style={{ fontSize: 11, color: T.textDim }}>{customQuestions.length} question{customQuestions.length !== 1 ? 's' : ''} written by you</div>
+                  </div>
+                  <div style={{ width: 20, height: 20, borderRadius: '50%', flexShrink: 0, background: active ? '#C084FC' : 'rgba(255,255,255,0.07)', border: `1.5px solid ${active ? '#C084FC' : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, color: '#fff', transition: 'all .18s' }}>{active ? '✓' : ''}</div>
+                </button>
+              );
+            })()}
+
             {state.mode === 'reverse' && (
               <div style={{ padding: '10px 14px', borderRadius: T.r, border: '1px solid rgba(86,207,178,0.3)', background: 'rgba(86,207,178,0.06)', fontSize: 12, color: 'rgba(86,207,178,0.85)', fontWeight: 600 }}>
                 🔄 Reverse mode uses its own built-in question pack automatically.
+              </div>
+            )}
+          </div>
+
+          {/* ── Custom Question Editor ── */}
+          <div style={{ marginBottom: 22 }}>
+            <button
+              onClick={() => { haptic(15); setShowCustomEditor(v => !v); }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '12px 16px', borderRadius: showCustomEditor ? `${T.r}px ${T.r}px 0 0` : T.r, border: `1px solid ${showCustomEditor ? 'rgba(192,132,252,0.35)' : T.border}`, borderBottom: showCustomEditor ? 'none' : undefined, background: showCustomEditor ? 'rgba(192,132,252,0.07)' : T.surface, fontFamily: 'inherit', cursor: 'pointer', transition: 'all .18s' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 18 }}>✏️</span>
+                <div style={{ textAlign: 'left' }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: showCustomEditor ? '#C084FC' : T.text, display: 'block' }}>Write Custom Questions</span>
+                  <span style={{ fontSize: 11, color: T.textDim }}>{customQuestions.length > 0 ? `${customQuestions.length} saved` : 'Add your own question pairs'}</span>
+                </div>
+              </div>
+              <span style={{ color: T.textDim, fontSize: 18, fontWeight: 700, transition: 'transform .2s', display: 'inline-block', transform: showCustomEditor ? 'rotate(180deg)' : 'none' }}>⌄</span>
+            </button>
+
+            {showCustomEditor && (
+              <div style={{ padding: '16px', border: '1px solid rgba(192,132,252,0.35)', borderTop: 'none', borderRadius: `0 0 ${T.r}px ${T.r}px`, background: 'rgba(192,132,252,0.04)', animation: 'fadeUp .2s ease both' }}>
+                <p style={{ ...S.lbl, color: 'rgba(192,132,252,0.6)', marginBottom: 8 }}>New question pair</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+                  <div>
+                    <label style={{ fontSize: 10, color: T.textDim, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', display: 'block', marginBottom: 5 }}>Question A — shown to most players</label>
+                    <input
+                      value={customDraftA}
+                      onChange={e => setCustomDraftA(e.target.value)}
+                      placeholder="e.g. What's your go-to road trip snack?"
+                      style={S.inp}
+                      onFocus={e => { e.target.style.borderColor = '#C084FC'; e.target.style.boxShadow = '0 0 0 3px rgba(192,132,252,0.12)'; }}
+                      onBlur={e  => { e.target.style.borderColor = T.border;  e.target.style.boxShadow = 'none'; }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 10, color: T.textDim, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', display: 'block', marginBottom: 5 }}>Question B — shown to the outlier</label>
+                    <input
+                      value={customDraftB}
+                      onChange={e => setCustomDraftB(e.target.value)}
+                      placeholder="e.g. What do you always eat on a long drive?"
+                      style={S.inp}
+                      onFocus={e => { e.target.style.borderColor = '#C084FC'; e.target.style.boxShadow = '0 0 0 3px rgba(192,132,252,0.12)'; }}
+                      onBlur={e  => { e.target.style.borderColor = T.border;  e.target.style.boxShadow = 'none'; }}
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={handleAddCustomQuestion}
+                  disabled={!customDraftA.trim() || !customDraftB.trim()}
+                  style={D.btn('#C084FC', false, true, !customDraftA.trim() || !customDraftB.trim())}
+                >
+                  + Add Question
+                </button>
+
+                {customQuestions.length > 0 && (
+                  <div style={{ marginTop: 16 }}>
+                    <p style={{ ...S.lbl, marginBottom: 10 }}>Saved ({customQuestions.length})</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                      {customQuestions.map((q, i) => (
+                        <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 13px', background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.border}`, borderRadius: 12 }}>
+                          <div style={{ flex: 1 }}>
+                            <p style={{ fontSize: 12, color: T.textMid, margin: '0 0 3px', lineHeight: 1.5 }}>{q.a}</p>
+                            <p style={{ fontSize: 11, color: T.textDim, margin: 0, fontStyle: 'italic', lineHeight: 1.4 }}>Outlier: {q.b}</p>
+                          </div>
+                          <button onClick={() => handleDeleteCustomQuestion(i)} style={{ background: 'none', border: 'none', color: T.textDim, fontSize: 20, cursor: 'pointer', padding: '0 2px', lineHeight: 1, flexShrink: 0, marginTop: 1 }}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -955,7 +1362,6 @@ function App() {
 
           {state.timerEnabled && <TimerBar timeLeft={timeLeft} total={state.timerSeconds} accent={curAnsColor} />}
 
-          {/* Modifiers */}
           <ModifierBanner modifiers={activeModInfo} />
 
           {/* Imposter alert */}
@@ -981,9 +1387,22 @@ function App() {
             <p style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.55, color: T.text, margin: 0 }}>{curQ}</p>
           </div>
 
+          {/* Answer with character counter */}
           <div style={{ textAlign: 'left', marginBottom: 14 }}>
             <label style={S.lbl}>Your answer</label>
-            <textarea value={state.writing} onChange={e => dispatch({ type: 'SET_WRITING', value: e.target.value })} placeholder="Type your answer…" rows={3} style={{ ...S.inp, border: `1.5px solid ${curAnsColor}50`, lineHeight: 1.6, boxShadow: `0 0 0 3px ${curAnsColor}10` }} />
+            <textarea
+              value={state.writing}
+              onChange={e => dispatch({ type: 'SET_WRITING', value: e.target.value.slice(0, ANSWER_CHAR_LIMIT) })}
+              placeholder="Type your answer…"
+              rows={3}
+              maxLength={ANSWER_CHAR_LIMIT}
+              style={{ ...S.inp, border: `1.5px solid ${curAnsColor}50`, lineHeight: 1.6, boxShadow: `0 0 0 3px ${curAnsColor}10` }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 5 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: charColor, transition: 'color .2s' }}>
+                {charCount} / {ANSWER_CHAR_LIMIT}
+              </span>
+            </div>
           </div>
 
           <PBtn col={curAnsColor} onClick={handleSubmitAnswer}>
@@ -1025,7 +1444,7 @@ function App() {
               const picked = picks.includes(player.name);
               const isSelf = player.name === voterName;
               return (
-                <div key={player.id} onClick={() => { if (!isSelf) handleCastVote(player.name); }} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '13px 15px', borderRadius: T.r, cursor: isSelf ? 'default' : 'pointer', background: picked ? `${col}14` : 'rgba(255,255,255,0.03)', border: `1px solid ${picked ? col + '55' : isSelf ? T.border : T.border}`, boxShadow: picked ? `0 0 0 1px ${col}20, 0 6px 20px ${col}20` : 'none', transition: 'all .18s', opacity: isSelf ? 0.45 : 1 }}>
+                <div key={player.id} onClick={() => { if (!isSelf) handleCastVote(player.name); }} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '13px 15px', borderRadius: T.r, cursor: isSelf ? 'default' : 'pointer', background: picked ? `${col}14` : 'rgba(255,255,255,0.03)', border: `1px solid ${picked ? col + '55' : T.border}`, boxShadow: picked ? `0 0 0 1px ${col}20, 0 6px 20px ${col}20` : 'none', transition: 'all .18s', opacity: isSelf ? 0.45 : 1 }}>
                   <div style={D.avatar(col)}>{player.name[0]?.toUpperCase()}</div>
                   <div style={{ flex: 1 }}>
                     <p style={{ margin: 0, fontWeight: 800, fontSize: 13, color: picked ? col : T.textMid }}>{player.name}{isSelf ? ' (you)' : ''}</p>
@@ -1125,13 +1544,27 @@ function App() {
             </div>
           )}
 
-          {/* Stage 3 — leaderboard + next */}
+          {/* Stage 3 — round card + leaderboard + next */}
           {state.revealStage >= 3 && (
             <div style={{ animation: 'fadeUp .4s ease both' }}>
               <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)', margin: '20px 0' }} />
+
               {state.questionsCycled && (
                 <p style={{ color: 'rgba(255,159,69,0.65)', fontSize: 11, textAlign: 'center', marginBottom: 12, fontStyle: 'italic' }}>🔄 All questions used — cycling back through the deck</p>
               )}
+
+              {/* Round Summary Card */}
+              <RoundSummaryCard
+                round={state.round}
+                totalRounds={state.totalRounds}
+                groupWon={groupWon}
+                impNames={impNames}
+                qPair={state.qPair}
+                answers={state.answers}
+                players={state.players}
+                mode={state.mode}
+              />
+
               <p style={{ ...S.lbl, marginBottom: 12 }}>Leaderboard · Round {state.round}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 20 }}>
                 {Object.entries(state.scores).sort((a, b) => b[1] - a[1]).map(([name, pts], i) => {
@@ -1178,7 +1611,7 @@ function App() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
               <button onClick={handleBeginGame} style={D.btn('grad')}>Play Again (Same Players) →</button>
-              <button onClick={() => { SoundEngine.click(); dispatch({ type: 'RESET_TO_SETUP' }); }} style={{ display: 'block', width: '100%', padding: '12px', borderRadius: 14, border: `1px solid ${T.border}`, background: 'transparent', color: T.textMid, fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>Change Settings</button>
+              <button onClick={() => { haptic(20); SoundEngine.click(); dispatch({ type: 'RESET_TO_SETUP' }); }} style={{ display: 'block', width: '100%', padding: '12px', borderRadius: 14, border: `1px solid ${T.border}`, background: 'transparent', color: T.textMid, fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>Change Settings</button>
             </div>
           </div>
         );
