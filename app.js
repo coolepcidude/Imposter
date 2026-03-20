@@ -33,10 +33,18 @@ const MODES = [
 ];
 
 const MODIFIERS = [
-  { id: 'numbers',  emoji: '🔢', label: 'Numbers Only',   rule: 'Your answer must only contain numbers.' },
-  { id: 'emojis',   emoji: '😏', label: 'Emojis Only',    rule: 'Your answer must only use emojis.' },
-  { id: 'specific', emoji: '🔬', label: 'Oddly Specific', rule: 'Be as specific as humanly possible.' },
-  { id: 'vague',    emoji: '🌫️', label: 'Stay Vague',     rule: 'Be as vague as possible — no names, no details.' },
+  { id: 'numbers',    emoji: '🔢', label: 'Numbers Only',    rule: 'Your answer must only contain numbers.' },
+  { id: 'emojis',     emoji: '😏', label: 'Emojis Only',     rule: 'Your answer must only use emojis. No words.' },
+  { id: 'specific',   emoji: '🔬', label: 'Oddly Specific',  rule: 'Be as specific as humanly possible.' },
+  { id: 'vague',      emoji: '🌫️', label: 'Stay Vague',      rule: 'Be as vague as possible — no names, no details.' },
+  { id: 'oneword',    emoji: '1️⃣',  label: 'One Word',        rule: 'Your entire answer must be exactly one word.' },
+  { id: 'threewords', emoji: '3️⃣',  label: 'Three Words',     rule: 'Your answer must be exactly three words. No more, no less.' },
+  { id: 'allcaps',    emoji: '📢', label: 'All Caps',         rule: 'WRITE YOUR ENTIRE ANSWER IN ALL CAPS.' },
+  { id: 'question',   emoji: '❓', label: 'Answer in a Question', rule: 'Your answer must be phrased as a question. Jeopardy-style.' },
+  { id: 'thirdperson',emoji: '🫵', label: 'Third Person',    rule: 'Refer to yourself in the third person. No "I" or "me".' },
+  { id: 'novowels',   emoji: '🚫', label: 'No Vowels',        rule: 'Write your answer without any vowels. Cnsnnnts nly.' },
+  { id: 'movietitle', emoji: '🎬', label: 'Movie Title',      rule: 'Format your answer like a movie title. Capitalise Each Word.' },
+  { id: 'rhyme',      emoji: '🎵', label: 'Make It Rhyme',    rule: 'Your answer must rhyme — at least the last two words.' },
 ];
 
 const QUESTION_PACKS = [
@@ -129,9 +137,11 @@ const INITIAL_STATE = {
   votes:     {},
 
   roundPts:    {},
-  confetti:    false,
-  revealStage: 0,
-  groupWon:    false,
+  confetti:        false,
+  revealStage:     0,
+  groupWon:        false,
+  roundModifier:   null,
+  lastModifierIdx: -1,
 };
 
 /* ──────────────────────────────────────
@@ -166,7 +176,7 @@ function reducer(state, action) {
       return { ...state, nameError: action.error };
 
     case 'BEGIN_GAME': {
-      const { validPlayers, roundData } = action;
+      const { validPlayers, roundData, modifier, modifierIdx } = action;
       const scores = {};
       validPlayers.forEach(p => { scores[p.name] = 0; });
       return {
@@ -185,6 +195,8 @@ function reducer(state, action) {
         curAns:   0, answers:  {}, writing:  '',
         curVoter: 0, votes:    {}, roundPts: {},
         confetti: false, groupWon: false, revealStage: 0, nameError: '',
+        roundModifier:   modifier   ?? null,
+        lastModifierIdx: modifierIdx ?? -1,
         phase: 'q_handoff',
       };
     }
@@ -238,7 +250,7 @@ function reducer(state, action) {
     case 'SET_CONFETTI':     return { ...state, confetti: action.value };
 
     case 'NEXT_ROUND': {
-      const { roundData, newRound } = action;
+      const { roundData, newRound, modifier, modifierIdx } = action;
       return {
         ...state,
         round:           newRound,
@@ -253,6 +265,8 @@ function reducer(state, action) {
         curAns:   0, answers:  {}, writing:  '',
         curVoter: 0, votes:    {}, roundPts: {},
         confetti: false, groupWon: false, revealStage: 0,
+        roundModifier:   modifier   ?? null,
+        lastModifierIdx: modifierIdx ?? -1,
         phase: 'q_handoff',
       };
     }
@@ -497,19 +511,15 @@ const PBtn = memo(function PBtn({ col, ghost, sm, dis, onClick, children }) {
   return <button onClick={onClick} disabled={dis} style={D.btn(col, ghost, sm, dis)}>{children}</button>;
 });
 
-const ModifierBanner = memo(function ModifierBanner({ modifiers }) {
-  if (!modifiers || modifiers.length === 0) return null;
+const ModifierBanner = memo(function ModifierBanner({ modifier }) {
+  if (!modifier) return null;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
-      {modifiers.map(mod => (
-        <div key={mod.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderRadius: 12, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.28)' }}>
-          <span style={{ fontSize: 15 }}>{mod.emoji}</span>
-          <div>
-            <span style={{ fontSize: 11, fontWeight: 800, color: '#FBBF24', letterSpacing: 1.5, textTransform: 'uppercase' }}>{mod.label}</span>
-            <span style={{ display: 'block', fontSize: 12, color: 'rgba(251,191,36,0.75)', marginTop: 1 }}>{mod.rule}</span>
-          </div>
-        </div>
-      ))}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', borderRadius: 12, background: 'rgba(192,132,252,0.08)', border: '1px solid rgba(192,132,252,0.35)', marginBottom: 14, animation: 'popIn .3s ease both' }}>
+      <span style={{ fontSize: 22, flexShrink: 0 }}>{modifier.emoji}</span>
+      <div>
+        <span style={{ fontSize: 11, fontWeight: 800, color: '#C084FC', letterSpacing: 1.5, textTransform: 'uppercase', display: 'block' }}>{modifier.label}</span>
+        <span style={{ fontSize: 13, color: 'rgba(192,132,252,0.85)', marginTop: 2, display: 'block', lineHeight: 1.4 }}>{modifier.rule}</span>
+      </div>
     </div>
   );
 });
@@ -669,7 +679,7 @@ function App() {
   const [showCustomEditor, setShowCustomEditor] = useState(false);
 
   /* ── Modifiers / timer / sound ── */
-  const [activeModifiers, setActiveModifiers] = useState([]);
+  const [modifiersEnabled, setModifiersEnabled] = useState(false);
   const [timeLeft,        setTimeLeft]        = useState(30);
   const [soundOn,         setSoundOn]         = useState(true);
   const timerRef     = useRef(null);
@@ -763,11 +773,17 @@ function App() {
     }
   }, [state.phase, state.revealStage, state.groupWon]);
 
+  /* ── Modifier picker — avoids repeating the same modifier two rounds in a row ── */
+  const pickModifier = useCallback((lastIdx) => {
+    const pool = MODIFIERS.map((_, i) => i).filter(i => i !== lastIdx);
+    const idx  = pool[Math.floor(Math.random() * pool.length)];
+    return { modifier: MODIFIERS[idx], modifierIdx: idx };
+  }, []);
+
   /* ── Derived ── */
-  const validPlayers  = state.players.filter(p => p.name.trim());
-  const pc            = validPlayers.length;
-  const mInfo         = MODES.find(m => m.id === state.mode) || MODES[0];
-  const activeModInfo = MODIFIERS.filter(m => activeModifiers.includes(m.id));
+  const validPlayers = state.players.filter(p => p.name.trim());
+  const pc           = validPlayers.length;
+  const mInfo        = MODES.find(m => m.id === state.mode) || MODES[0];
 
   const curAnsPlayer = state.players[state.qOrder[state.curAns]];
   const curAnsName   = curAnsPlayer?.name || '';
@@ -814,10 +830,6 @@ function App() {
     );
   }, []);
 
-  const toggleModifier = useCallback((id) => {
-    setActiveModifiers(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  }, []);
-
   const handleAddCustomQuestion = useCallback(() => {
     if (!customDraftA.trim() || !customDraftB.trim()) return;
     haptic(30); SoundEngine.click();
@@ -844,9 +856,12 @@ function App() {
     haptic([40, 20, 80]);
     resetRNG();
     const roundData = createRound({ players: valid, mode: state.mode, questions: qs, used: [] });
-    dispatch({ type: 'BEGIN_GAME', validPlayers: valid, roundData });
+    const { modifier, modifierIdx } = modifiersEnabled
+      ? pickModifier(-1)
+      : { modifier: null, modifierIdx: -1 };
+    dispatch({ type: 'BEGIN_GAME', validPlayers: valid, roundData, modifier, modifierIdx });
     SoundEngine.click();
-  }, [state.players, state.mode, qs]);
+  }, [state.players, state.mode, qs, modifiersEnabled, pickModifier]);
 
   const handleSubmitAnswer = useCallback(() => {
     submittedRef.current = true;
@@ -869,8 +884,11 @@ function App() {
     haptic(30); SoundEngine.click();
     if (state.round >= state.totalRounds) { dispatch({ type: 'GO_FINAL' }); return; }
     const roundData = createRound({ players: state.players, mode: state.mode, questions: qs, used: state.usedIdx });
-    dispatch({ type: 'NEXT_ROUND', roundData, newRound: state.round + 1 });
-  }, [state.round, state.totalRounds, state.players, state.mode, state.usedIdx, qs]);
+    const { modifier, modifierIdx } = modifiersEnabled
+      ? pickModifier(state.lastModifierIdx)
+      : { modifier: null, modifierIdx: -1 };
+    dispatch({ type: 'NEXT_ROUND', roundData, newRound: state.round + 1, modifier, modifierIdx });
+  }, [state.round, state.totalRounds, state.players, state.mode, state.usedIdx, qs, modifiersEnabled, state.lastModifierIdx, pickModifier]);
 
   const handleToggleSound = useCallback(() => {
     const next = SoundEngine.toggle(); setSoundOn(next); haptic(20);
@@ -986,15 +1004,16 @@ function App() {
 
           {/* Modifiers */}
           <p style={S.lbl}>Modifiers</p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 22 }}>
-            {MODIFIERS.map(mod => {
-              const active = activeModifiers.includes(mod.id);
-              return (
-                <button key={mod.id} onClick={() => { haptic(15); toggleModifier(mod.id); }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 99, border: `1px solid ${active ? 'rgba(251,191,36,0.4)' : T.border}`, background: active ? 'rgba(251,191,36,0.1)' : T.surface, color: active ? '#FBBF24' : T.textMid, fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', transition: 'all .18s' }}>
-                  <span>{mod.emoji}</span><span>{mod.label}</span>
-                </button>
-              );
-            })}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', borderRadius: T.r, marginBottom: 22, background: modifiersEnabled ? 'rgba(192,132,252,0.08)' : T.surface, border: `1px solid ${modifiersEnabled ? 'rgba(192,132,252,0.3)' : T.border}`, transition: 'all .2s' }}>
+            <div>
+              <span style={{ fontWeight: 800, fontSize: 14, color: modifiersEnabled ? '#C084FC' : T.text }}>🎲 Random Modifiers</span>
+              <span style={{ display: 'block', fontSize: 11, color: T.textDim, marginTop: 2 }}>
+                {modifiersEnabled ? 'A new rule is added to every round for everyone' : 'One surprise rule for everyone each round'}
+              </span>
+            </div>
+            <button className="toggle-track" onClick={() => { haptic(20); setModifiersEnabled(v => !v); }} style={{ background: modifiersEnabled ? '#C084FC' : 'rgba(255,255,255,0.12)', flexShrink: 0 }}>
+              <div className="toggle-thumb" style={{ left: modifiersEnabled ? 21 : 3 }} />
+            </button>
           </div>
 
           {/* Question Packs */}
@@ -1151,7 +1170,7 @@ function App() {
           <p style={{ color: T.textDim, fontSize: 13, marginBottom: 18, fontWeight: 600 }}>{state.curAns + 1} of {pc}</p>
 
           {state.timerEnabled && <TimerBar timeLeft={timeLeft} total={state.timerSeconds} accent={curAnsColor} />}
-          <ModifierBanner modifiers={activeModInfo} />
+          {state.roundModifier && <ModifierBanner modifier={state.roundModifier} />}
 
           {curIsImp && state.mode !== 'clueless' && state.mode !== 'reverse' && (
             <div style={{ background: 'rgba(255,107,107,0.08)', border: '1.5px solid rgba(255,107,107,0.5)', borderRadius: T.r, padding: '13px 16px', marginBottom: 14, boxShadow: '0 0 30px rgba(255,107,107,0.2)', animation: 'popIn .35s ease both' }}>
