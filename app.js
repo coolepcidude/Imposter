@@ -56,7 +56,7 @@ const QUESTION_PACKS = [
   { id: 'nostalgia',    label: 'Nostalgia',    emoji: '📼', file: 'questions/Nostalgia.JSON',      desc: 'Childhood memories & throwbacks' },
   { id: 'numbers',      label: 'Numbers',      emoji: '🔢', file: 'questions/Numbers.JSON',        desc: 'All answers are numbers' },
   { id: 'sentences',    label: 'Sentences',    emoji: '✏️', file: 'questions/Sentences.JSON',      desc: 'Complete the sentence' },
-  { id: 'reverse',      label: 'Reverse',      emoji: '🔄', file: 'questions/Reverse.JSON',        desc: 'Curated for Reverse mode — variants feel similar' },
+  { id: 'reverse',      label: 'Reverse',      emoji: '🔄', file: 'questions/Reverse.JSON',        desc: 'You get a word — write a question it answers. Find the pair.' },
 ];
 
 const ANSWER_CHAR_LIMIT = 80;
@@ -1059,7 +1059,7 @@ function App() {
           {/* Reverse mode hint */}
           {state.mode === 'reverse' && (
             <div style={{ padding: '10px 14px', borderRadius: T.r, border: '1px solid rgba(86,207,178,0.3)', background: 'rgba(86,207,178,0.06)', fontSize: 12, color: 'rgba(86,207,178,0.85)', fontWeight: 600, marginBottom: 14 }}>
-              🔄 The <strong>Reverse</strong> pack is curated for this mode, but any pack works.
+              🔄 Each player sees a word and writes a question it could answer. Two players share the same word — find the pair.
             </div>
           )}
 
@@ -1181,21 +1181,21 @@ function App() {
 
           {isReverse && (
             <div style={{ background: 'rgba(86,207,178,0.07)', border: '1px solid rgba(86,207,178,0.3)', borderRadius: T.r, padding: '10px 14px', marginBottom: 14 }}>
-              <p style={{ fontSize: 12, color: 'rgba(86,207,178,0.8)', margin: 0, fontWeight: 600 }}>🔄 Everyone gets a different question — but two players share the same one. Find the pair!</p>
+              <p style={{ fontSize: 12, color: 'rgba(86,207,178,0.8)', margin: 0, fontWeight: 600 }}>🔄 Write a question that your word could be the answer to. Two players have the same word — don't give it away!</p>
             </div>
           )}
 
           <div style={{ background: `${curAnsColor}14`, border: `1.5px solid ${curAnsColor}45`, borderRadius: T.rl, padding: '22px 18px', marginBottom: 16, boxShadow: `0 0 30px ${curAnsColor}20` }}>
-            <p style={{ ...S.lbl, textAlign: 'center', color: curAnsColor + 'cc', marginBottom: 10 }}>Your question</p>
-            <p style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.55, color: T.text, margin: 0 }}>{curQ}</p>
+            <p style={{ ...S.lbl, textAlign: 'center', color: curAnsColor + 'cc', marginBottom: 10 }}>{isReverse ? 'Your word' : 'Your question'}</p>
+            <p style={{ fontSize: isReverse ? 36 : 19, fontWeight: isReverse ? 900 : 700, lineHeight: 1.55, color: T.text, margin: 0, letterSpacing: isReverse ? '-1px' : 'normal' }}>{curQ}</p>
           </div>
 
           <div style={{ textAlign: 'left', marginBottom: 14 }}>
-            <label style={S.lbl}>Your answer</label>
+            <label style={S.lbl}>{isReverse ? 'Your question' : 'Your answer'}</label>
             <textarea
               value={state.writing}
               onChange={e => dispatch({ type: 'SET_WRITING', value: e.target.value.slice(0, ANSWER_CHAR_LIMIT) })}
-              placeholder="Type your answer…"
+              placeholder={isReverse ? 'Write a question your word could answer…' : 'Type your answer…'}
               rows={3}
               maxLength={ANSWER_CHAR_LIMIT}
               style={{ ...S.inp, border: `1.5px solid ${curAnsColor}50`, lineHeight: 1.6, boxShadow: `0 0 0 3px ${curAnsColor}10` }}
@@ -1228,11 +1228,11 @@ function App() {
               </div>
             </div>
             <p style={{ color: T.textMid, fontSize: 13, fontWeight: 600 }}>
-              {state.mode === 'doublecross' ? 'Pick your 2 suspects — both could be outliers!' : isReverse ? 'Vote for who you think had the same question as someone else' : 'Tap who you think had the different question'}
+              {state.mode === 'doublecross' ? 'Pick your 2 suspects — both could be outliers!' : isReverse ? 'Whose question sounds like it answers the same word as someone else?' : 'Tap who you think had the different question'}
             </p>
           </div>
 
-          <p style={S.lbl}>Everyone's Answers</p>
+          <p style={S.lbl}>{isReverse ? "Everyone's Questions" : "Everyone's Answers"}</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
             {state.players.map(player => {
               const col    = COLORS[player.colorIdx];
@@ -1285,8 +1285,8 @@ function App() {
               <p style={{ fontSize: 10, letterSpacing: 3.5, textTransform: 'uppercase', color: T.textDim, fontWeight: 700, marginBottom: 8 }}>{isReverse ? 'The matching pair was' : impNames.length > 1 ? 'The outliers were' : 'The outlier was'}</p>
               <h2 style={{ fontSize: impNames.length > 1 ? 30 : 42, fontWeight: 900, margin: '0 0 14px', letterSpacing: '-1px', color: groupWon ? '#34D399' : '#FF6B6B', textShadow: `0 0 50px ${groupWon ? '#34D39988' : '#FF6B6B88'}`, animation: 'revealName .7s ease both' }}>{impNames.join(' & ')}</h2>
               <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: '12px 14px', marginBottom: 10, textAlign: 'left', border: `1px solid ${T.border}` }}>
-                <p style={{ fontSize: 9, color: T.textDim, letterSpacing: 3, textTransform: 'uppercase', fontWeight: 700, marginBottom: 5 }}>{isReverse ? 'Their shared question was' : 'Their question was'}</p>
-                <p style={{ fontSize: 13, fontStyle: 'italic', color: T.textMid, lineHeight: 1.55 }}>"{state.qPair?.b}"</p>
+                <p style={{ fontSize: 9, color: T.textDim, letterSpacing: 3, textTransform: 'uppercase', fontWeight: 700, marginBottom: 5 }}>{isReverse ? 'Their shared word was' : 'Their question was'}</p>
+                <p style={{ fontSize: isReverse ? 28 : 13, fontWeight: isReverse ? 900 : 400, fontStyle: isReverse ? 'normal' : 'italic', color: isReverse ? '#56CFB2' : T.textMid, lineHeight: 1.55, letterSpacing: isReverse ? '-0.5px' : 'normal' }}>{isReverse ? state.qPair?.b : `"${state.qPair?.b}"`}</p>
               </div>
               {!isReverse && (
                 <>
