@@ -144,7 +144,8 @@ const INITIAL_STATE = {
   qOrder:[], curAns:0, qPair:null, impIdxs:[], answers:{}, writing:'',
   playerVariants:null, playerSubject:null, voteOrder:[], curVoter:0, votes:{},
   roundPts:{}, confetti:false, revealStage:0, groupWon:false,
-  roundModifier:null, lastModifierIdx:-1,
+  playerModifiers:{},
+  confidenceEnabled:false, voteConfidences:{},
 };
 
 /* ── Reducer ── */
@@ -166,7 +167,7 @@ function reducer(state, action) {
       return {...state, nameError:'', players:state.players.map(p=>p.id===action.id?{...p,name:action.name}:p)};
     case 'SET_NAME_ERROR': return {...state, nameError:action.error};
     case 'BEGIN_GAME': {
-      const {validPlayers,roundData,modifier,modifierIdx}=action;
+      const {validPlayers,roundData}=action;
       const scores={};
       validPlayers.forEach(p=>{scores[p.name]=0;});
       return {
@@ -175,10 +176,15 @@ function reducer(state, action) {
         impIdxs:roundData.impIdxs, playerVariants:roundData.playerVariants, playerSubject:roundData.playerSubject,
         voteOrder:roundData.voteOrder, curAns:0, answers:{}, writing:'', curVoter:0, votes:{}, roundPts:{},
         confetti:false, groupWon:false, revealStage:0, nameError:'',
-        roundModifier:modifier??null, lastModifierIdx:modifierIdx??-1, phase:'q_handoff',
+        playerModifiers:action.playerModifiers??{}, voteConfidences:{}, phase:'q_handoff',
       };
     }
     case 'SET_PHASE':   return {...state, phase:action.phase};
+    case 'TOGGLE_CONFIDENCE': return {...state, confidenceEnabled:!state.confidenceEnabled};
+    case 'SET_VOTE_CONFIDENCE': {
+      const vc=state.voteOrder[state.curVoter];
+      return {...state, voteConfidences:{...state.voteConfidences,[vc]:action.confidence}};
+    }
     case 'SET_WRITING': return {...state, writing:action.value};
     case 'SUBMIT_ANSWER': {
       const pName=state.players[state.qOrder[state.curAns]]?.name||'…';
@@ -210,6 +216,18 @@ function reducer(state, action) {
       const pNames=state.players.map(p=>p.name);
       const impNames=state.impIdxs.map(i=>state.players[i]?.name).filter(Boolean);
       const earned=computeRoundScores(state.votes,impNames,state.mode,pNames);
+      /* Confidence bonuses/penalties: conf 2 → ±1, conf 3 → ±2 */
+      if (state.confidenceEnabled) {
+        const isMM=state.mode==='doublecross'||state.mode==='reverse';
+        pNames.forEach(voter=>{
+          const conf=state.voteConfidences[voter]||1;
+          if (conf<=1) return;
+          const correct=isMM
+            ?(state.votes[voter]||[]).some(v=>impNames.includes(v))
+            :impNames.includes(state.votes[voter]);
+          earned[voter]=(earned[voter]||0)+(correct?(conf-1):-(conf-1));
+        });
+      }
       const nScores={};
       pNames.forEach(n=>{nScores[n]=(state.scores[n]||0)+(earned[n]||0);});
       const won=checkGroupWon(state.votes,impNames,state.mode);
@@ -218,14 +236,14 @@ function reducer(state, action) {
     case 'SET_REVEAL_STAGE': return {...state,revealStage:action.stage};
     case 'SET_CONFETTI':     return {...state,confetti:action.value};
     case 'NEXT_ROUND': {
-      const {roundData,newRound,modifier,modifierIdx}=action;
+      const {roundData,newRound,playerModifiers}=action;
       return {
         ...state, round:newRound, usedIdx:roundData.newUsed, questionsCycled:roundData.isCycling,
         qPair:roundData.qPair, qOrder:roundData.qOrder, impIdxs:roundData.impIdxs,
         playerVariants:roundData.playerVariants, playerSubject:roundData.playerSubject,
         voteOrder:roundData.voteOrder, curAns:0, answers:{}, writing:'', curVoter:0, votes:{}, roundPts:{},
         confetti:false, groupWon:false, revealStage:0,
-        roundModifier:modifier??null, lastModifierIdx:modifierIdx??-1, phase:'q_handoff',
+        playerModifiers:playerModifiers??{}, voteConfidences:{}, phase:'q_handoff',
       };
     }
     case 'GO_FINAL': return {...state,phase:'final'};
@@ -235,6 +253,7 @@ function reducer(state, action) {
         players:state.players.map((p,i)=>({...p,colorIdx:i%COLORS.length})),
         mode:state.mode, totalRounds:state.totalRounds,
         timerEnabled:state.timerEnabled, timerSeconds:state.timerSeconds,
+        confidenceEnabled:state.confidenceEnabled,
       };
     default: return state;
   }
@@ -510,13 +529,24 @@ const SettingsPage = memo(function SettingsPage({state,dispatch,activePacks,togg
       </div>
 
       <p style={S.lbl}>Modifiers</p>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'13px 16px',borderRadius:T.r,marginBottom:22,background:modifiersEnabled?'rgba(168,85,247,.08)':T.surface,border:`1px solid ${modifiersEnabled?'rgba(168,85,247,.3)':T.border}`,transition:'all .2s'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'13px 16px',borderRadius:T.r,marginBottom:10,background:modifiersEnabled?'rgba(168,85,247,.08)':T.surface,border:`1px solid ${modifiersEnabled?'rgba(168,85,247,.3)':T.border}`,transition:'all .2s'}}>
         <div>
           <span style={{fontWeight:800,fontSize:14,color:modifiersEnabled?'#A855F7':T.text}}>🎲 Random Modifiers</span>
-          <span style={{display:'block',fontSize:11,color:T.textDim,marginTop:2}}>{modifiersEnabled?'A surprise rule each round':'One surprise rule for everyone each round'}</span>
+          <span style={{display:'block',fontSize:11,color:T.textDim,marginTop:2}}>{modifiersEnabled?'Each player gets their own random rule':'Add a surprise personal rule each round'}</span>
         </div>
         <button className="toggle-track" onClick={()=>{haptic(20);setModifiersEnabled(v=>!v);}} style={{background:modifiersEnabled?'#A855F7':T.isDark?'rgba(255,220,130,.12)':'rgba(100,60,10,.12)',flexShrink:0}}>
           <div className="toggle-thumb" style={{left:modifiersEnabled?21:3}}/>
+        </button>
+      </div>
+
+      <p style={S.lbl}>Confidence Voting</p>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'13px 16px',borderRadius:T.r,marginBottom:22,background:state.confidenceEnabled?'rgba(59,130,246,.08)':T.surface,border:`1px solid ${state.confidenceEnabled?'rgba(59,130,246,.3)':T.border}`,transition:'all .2s'}}>
+        <div style={{paddingRight:12}}>
+          <span style={{fontWeight:800,fontSize:14,color:state.confidenceEnabled?'#3B82F6':T.text}}>🎯 Confidence Betting</span>
+          <span style={{display:'block',fontSize:11,color:T.textDim,marginTop:2,lineHeight:1.5}}>{state.confidenceEnabled?'🔥 safe · 🔥🔥 +bonus · 🔥🔥🔥 +big bonus (wrong = penalty)':'Bet on your vote — high confidence = bigger rewards & risks'}</span>
+        </div>
+        <button className="toggle-track" onClick={()=>{haptic(20);dispatch({type:'TOGGLE_CONFIDENCE'});}} style={{background:state.confidenceEnabled?'#3B82F6':T.isDark?'rgba(255,220,130,.12)':'rgba(100,60,10,.12)',flexShrink:0}}>
+          <div className="toggle-thumb" style={{left:state.confidenceEnabled?21:3}}/>
         </button>
       </div>
 
@@ -736,7 +766,14 @@ function App() {
     if (state.revealStage===2){const t=setTimeout(()=>dispatch({type:'SET_REVEAL_STAGE',stage:3}),900);return()=>clearTimeout(t);}
   },[state.phase,state.revealStage,state.groupWon]);
 
-  const pickMod=useCallback((last)=>{const p=MODIFIERS.map((_,i)=>i).filter(i=>i!==last);const i=p[Math.floor(Math.random()*p.length)];return{modifier:MODIFIERS[i],modifierIdx:i};},[]);
+  /* Assign a random modifier to each player independently */
+  const assignPlayerMods=useCallback((players)=>{
+    const mods={};
+    players.forEach(p=>{
+      mods[p.name]=MODIFIERS[Math.floor(Math.random()*MODIFIERS.length)];
+    });
+    return mods;
+  },[]);
 
   /* Derived */
   const valid=state.players.filter(p=>p.name.trim());
@@ -770,21 +807,27 @@ function App() {
     if (lower.length!==new Set(lower).size){dispatch({type:'SET_NAME_ERROR',error:'⚠️ Two players have the same name.'});return;}
     haptic([40,20,80]); resetRNG();
     const rd=createRound({players:v,mode:state.mode,questions:qs,used:[]});
-    const {modifier,modifierIdx}=modOn?pickMod(-1):{modifier:null,modifierIdx:-1};
-    dispatch({type:'BEGIN_GAME',validPlayers:v,roundData:rd,modifier,modifierIdx});
+    const playerModifiers=modOn?assignPlayerMods(v):{};
+    dispatch({type:'BEGIN_GAME',validPlayers:v,roundData:rd,playerModifiers});
     SoundEngine.click();
-  },[state.players,state.mode,qs,modOn,pickMod]);
+  },[state.players,state.mode,qs,modOn,assignPlayerMods]);
 
   const submitAns=useCallback(()=>{subRef.current=true;clearInterval(timerRef.current);haptic([40,30,40]);SoundEngine.submit();dispatch({type:'SUBMIT_ANSWER'});},[]);
   const castVote=useCallback(s=>{haptic(25);SoundEngine.vote();dispatch({type:'CAST_VOTE',suspect:s});},[]);
-  const confirmVote=useCallback(()=>{haptic(35);SoundEngine.click();dispatch({type:'CONFIRM_VOTE'});},[]);
+  const confirmVote=useCallback(()=>{
+    /* If confidence voting is on and player hasn't picked a confidence, default to 1 */
+    if (state.confidenceEnabled && !state.voteConfidences[state.voteOrder[state.curVoter]]) {
+      dispatch({type:'SET_VOTE_CONFIDENCE',confidence:1});
+    }
+    haptic(35); SoundEngine.click(); dispatch({type:'CONFIRM_VOTE'});
+  },[state.confidenceEnabled,state.voteConfidences,state.voteOrder,state.curVoter]);
   const nextRound=useCallback(()=>{
     haptic(30);SoundEngine.click();
     if (state.round>=state.totalRounds){dispatch({type:'GO_FINAL'});return;}
     const rd=createRound({players:state.players,mode:state.mode,questions:qs,used:state.usedIdx});
-    const {modifier,modifierIdx}=modOn?pickMod(state.lastModifierIdx):{modifier:null,modifierIdx:-1};
-    dispatch({type:'NEXT_ROUND',roundData:rd,newRound:state.round+1,modifier,modifierIdx});
-  },[state.round,state.totalRounds,state.players,state.mode,state.usedIdx,qs,modOn,state.lastModifierIdx,pickMod]);
+    const playerModifiers=modOn?assignPlayerMods(state.players):{};
+    dispatch({type:'NEXT_ROUND',roundData:rd,newRound:state.round+1,playerModifiers});
+  },[state.round,state.totalRounds,state.players,state.mode,state.usedIdx,qs,modOn,assignPlayerMods]);
   const toggleSound=useCallback(()=>{const n=SoundEngine.toggle();setSoundOn(n);haptic(20);},[]);
   const showQ=useCallback(()=>{haptic(30);SoundEngine.click();dispatch({type:'SET_PHASE',phase:'question'});},[]);
   const showVote=useCallback(()=>{haptic(30);SoundEngine.click();dispatch({type:'SET_PHASE',phase:'vote_cast'});},[]);
@@ -837,7 +880,7 @@ function App() {
           <button onClick={()=>{haptic(15);SoundEngine.click();setSetupPage('settings');}} style={{display:'flex',alignItems:'center',gap:12,width:'100%',padding:'12px 16px',borderRadius:T.r,border:`1px solid ${T.border}`,background:T.surface,textAlign:'left',fontFamily:'inherit',cursor:'pointer',marginBottom:10,transition:'all .18s'}}>
             <span style={{fontSize:20}}>{mInfo.emoji}</span>
             <div style={{flex:1}}>
-              <span style={{fontWeight:800,fontSize:13,color:mInfo.color,display:'block'}}>{mInfo.name} · {state.totalRounds} rounds{state.timerEnabled?` · ${state.timerSeconds}s timer`:''}{modOn?' · Modifiers on':''}</span>
+              <span style={{fontWeight:800,fontSize:13,color:mInfo.color,display:'block'}}>{mInfo.name} · {state.totalRounds} rounds{state.timerEnabled?` · ${state.timerSeconds}s timer`:''}{modOn?' · Modifiers on':''}{state.confidenceEnabled?' · Confidence on':''}</span>
               <span style={{fontSize:11,color:T.textDim}}>{activePacks.length} pack{activePacks.length!==1?'s':''} selected · Tap to change settings</span>
             </div>
             <span style={{color:T.textDim,fontSize:16}}>⚙</span>
@@ -899,7 +942,7 @@ function App() {
           <h2 style={{fontSize:42,fontWeight:900,margin:'0 0 4px',letterSpacing:'-1.5px',color:curCol,textShadow:`0 0 30px ${curCol}70`}}>{curName}</h2>
           <p style={{color:T.textDim,fontSize:13,marginBottom:18,fontWeight:600}}>{state.curAns+1} of {pc}</p>
           {state.timerEnabled&&<TimerBar timeLeft={timeLeft} total={state.timerSeconds} accent={curCol} T={T}/>}
-          {state.roundModifier&&<ModifierBanner modifier={state.roundModifier} T={T}/>}
+          {state.playerModifiers&&state.playerModifiers[curName]&&<ModifierBanner modifier={state.playerModifiers[curName]} T={T}/>}
           {curIsImp&&state.mode!=='clueless'&&!isRev&&(
             <div style={{background:T.isDark?'rgba(239,68,68,.08)':'rgba(185,28,28,.06)',border:'1.5px solid rgba(239,68,68,.5)',borderRadius:T.r,padding:'13px 16px',marginBottom:14,animation:'popIn .35s ease both'}}>
               <p style={{fontSize:16,fontWeight:900,margin:'0 0 4px',color:'#EF4444'}}>🎭 You are the outlier!</p>
@@ -968,6 +1011,38 @@ function App() {
               Select {2-(vPicks||[]).length} more suspect{(vPicks||[]).length===1?'':'s'}
             </div>
           )}
+
+          {/* ── Confidence betting ── */}
+          {state.confidenceEnabled&&(()=>{
+            const hasVoted=isMulti?(vPicks||[]).length>0:vPicks!=null;
+            const curConf=state.voteConfidences[vName]||1;
+            const CONF_LEVELS=[
+              {val:1,emoji:'🙂',label:'Safe',sub:'No bonus, no penalty',col:'#6B7280'},
+              {val:2,emoji:'🔥',label:'Confident',sub:'+1 if right · −1 if wrong',col:'#F97316'},
+              {val:3,emoji:'🚀',label:'Certain',sub:'+2 if right · −2 if wrong',col:'#EF4444'},
+            ];
+            return (
+              <div style={{background:T.isDark?'rgba(59,130,246,.07)':'rgba(37,99,235,.05)',border:`1px solid ${T.isDark?'rgba(59,130,246,.28)':'rgba(37,99,235,.2)'}`,borderRadius:T.r,padding:'14px 15px',marginBottom:14,opacity:hasVoted?1:.45,transition:'opacity .2s'}}>
+                <p style={{fontSize:10,fontWeight:800,color:'#3B82F6',letterSpacing:2,textTransform:'uppercase',marginBottom:10}}>🎯 How confident are you?</p>
+                {!hasVoted&&<p style={{fontSize:11,color:T.textDim,marginBottom:0,fontStyle:'italic'}}>Pick your suspect first, then set confidence.</p>}
+                {hasVoted&&(
+                  <div style={{display:'flex',gap:7}}>
+                    {CONF_LEVELS.map(lv=>{
+                      const sel=curConf===lv.val;
+                      return (
+                        <button key={lv.val} onClick={()=>{haptic(20);SoundEngine.click();dispatch({type:'SET_VOTE_CONFIDENCE',confidence:lv.val});}} style={{flex:1,padding:'10px 6px',borderRadius:12,border:`1.5px solid ${sel?lv.col+'80':T.border}`,background:sel?lv.col+'15':T.surface,fontFamily:'inherit',cursor:'pointer',transition:'all .18s',textAlign:'center'}}>
+                          <div style={{fontSize:20,marginBottom:3}}>{lv.emoji}</div>
+                          <div style={{fontSize:11,fontWeight:800,color:sel?lv.col:T.textMid}}>{lv.label}</div>
+                          <div style={{fontSize:9,color:T.textDim,marginTop:2,lineHeight:1.4}}>{lv.sub}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           <button onClick={confirmVote} disabled={isMulti?(vPicks||[]).length!==2:vPicks==null} style={D.btn(vAcc,false,false,isMulti?(vPicks||[]).length!==2:vPicks==null)}>
             {state.curVoter+1<pc?'Confirm Vote — pass the phone →':'Confirm Vote — see results!'}
           </button>
@@ -1004,23 +1079,29 @@ function App() {
           )}
           {state.revealStage>=2&&(
             <div style={{animation:'fadeUp .4s ease both'}}>
-              <p style={S.lbl}>Who voted for whom</p>
+              <p style={S.lbl}>Who voted for whom{state.confidenceEnabled?' · with confidence':''}</p>
               <div style={{display:'flex',flexDirection:'column',gap:7,marginBottom:16}}>
                 {state.players.map((player,i)=>{
                   const vFor=isMulti?(state.votes[player.name]||[]).join(' & ')||'—':state.votes[player.name]||'—';
                   const correct=isMulti?(state.votes[player.name]||[]).some(v=>impNames.includes(v)):impNames.includes(state.votes[player.name]);
                   const col=COLORS[player.colorIdx];
+                  const conf=state.confidenceEnabled?(state.voteConfidences[player.name]||1):null;
+                  const CONF_EMOJIS=['','🙂','🔥','🚀'];
+                  const ptDelta=conf&&conf>1?(correct?+(conf-1):-(conf-1)):null;
                   return (
                     <div key={player.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',background:correct?T.isDark?'rgba(16,185,129,.07)':'rgba(12,140,100,.05)':T.surface,border:`1px solid ${correct?'rgba(16,185,129,.3)':T.border}`,borderRadius:12,animation:'stagger .35s ease both',animationDelay:`${i*50}ms`}}>
                       <div style={D.avatar(col,28)}>{player.name[0]?.toUpperCase()}</div>
                       <span style={{flex:1,fontSize:13,fontWeight:700,color:T.textMid}}>{player.name}</span>
+                      {conf&&<span style={{fontSize:13}}>{CONF_EMOJIS[conf]}</span>}
                       <span style={{fontSize:12,color:T.textDim}}>→</span>
                       <span style={{fontSize:13,fontWeight:800,color:correct?'#10B981':T.textMid}}>{vFor}</span>
+                      {ptDelta!==null&&<span style={{fontSize:11,fontWeight:800,padding:'2px 7px',borderRadius:7,background:ptDelta>0?'rgba(16,185,129,.12)':'rgba(239,68,68,.12)',color:ptDelta>0?'#10B981':'#EF4444',border:`1px solid ${ptDelta>0?'rgba(16,185,129,.3)':'rgba(239,68,68,.3)'}`}}>{ptDelta>0?`+${ptDelta}`:ptDelta}</span>}
                       <span style={{fontSize:16}}>{correct?'✅':'❌'}</span>
                     </div>
                   );
                 })}
               </div>
+              {state.confidenceEnabled&&<p style={{fontSize:11,color:T.textDim,textAlign:'center',marginBottom:4,marginTop:-6}}>🎯 Confidence bonus/penalty shown above</p>}
             </div>
           )}
           {state.revealStage>=3&&(
