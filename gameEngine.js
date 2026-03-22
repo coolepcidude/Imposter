@@ -97,7 +97,7 @@ function pickQuestion(questions, used, rng) {
   return { pick, newUsed, isCycling };
 }
 
-function createStandardRound({ players, mode, questions, used }) {
+function createStandardRound({ players, mode, questions, used, randomOrder }) {
   const rng = getRNG(); const pc = players.length;
   const { pick, newUsed, isCycling } = pickQuestion(questions, used, rng);
   const variants = questions[pick].variants; const vLen = variants.length;
@@ -105,7 +105,7 @@ function createStandardRound({ players, mode, questions, used }) {
   let outlierIdx = Math.floor(rng() * (vLen - 1));
   if (outlierIdx >= groupIdx) outlierIdx++;
   const qPair = { a: variants[groupIdx], b: variants[outlierIdx] };
-  const qOrder = shuffleRNG(players.map((_,i) => i));
+  const qOrder = randomOrder ? shuffleRNG(players.map((_,i) => i)) : players.map((_,i) => i);
   let impIdxs;
   if (mode === 'doublecross' && pc >= 4) {
     const i1 = Math.floor(rng() * pc);
@@ -115,12 +115,12 @@ function createStandardRound({ players, mode, questions, used }) {
   } else {
     impIdxs = [Math.floor(rng() * pc)];
   }
-  const voteOrder = shuffleRNG(players.map(p => p.name));
+  const voteOrder = randomOrder ? shuffleRNG(players.map(p => p.name)) : players.map(p => p.name);
   const playerSubject = players[Math.floor(rng() * pc)].name;
   return { qPair, qOrder, impIdxs, voteOrder, newUsed, isCycling, playerVariants: null, playerSubject };
 }
 
-function createReverseRound({ players, questions, used }) {
+function createReverseRound({ players, questions, used, randomOrder }) {
   const rng = getRNG(); const pc = players.length;
   if (!questions || questions.length === 0) {
     return {
@@ -136,6 +136,8 @@ function createReverseRound({ players, questions, used }) {
   let i2 = Math.floor(rng() * (pc - 1));
   if (i2 >= i1) i2++;
   const twinIdxs = [i1, i2];
+  /* Variant assignment always uses a shuffled pass so twins don't predictably
+     get variants[0] — but the answering/voting order respects randomOrder. */
   const shuffled = shuffleRNG(players.map((_,i) => i));
   const playerVariants = {};
   let variantOffset = 1;
@@ -148,8 +150,8 @@ function createReverseRound({ players, questions, used }) {
       variantOffset++;
     }
   });
-  const qOrder = shuffleRNG(players.map((_,i) => i));
-  const voteOrder = shuffleRNG(players.map(p => p.name));
+  const qOrder = randomOrder ? shuffleRNG(players.map((_,i) => i)) : players.map((_,i) => i);
+  const voteOrder = randomOrder ? shuffleRNG(players.map(p => p.name)) : players.map(p => p.name);
   const playerSubject = players[Math.floor(rng() * pc)].name;
   return {
     qPair: { a: variants[0], b: variants[0] }, qOrder, impIdxs: twinIdxs,
@@ -157,7 +159,7 @@ function createReverseRound({ players, questions, used }) {
   };
 }
 
-function createRound({ players, mode, questions, used }) {
-  if (mode === 'reverse') return createReverseRound({ players, questions, used });
-  return createStandardRound({ players, mode, questions, used });
+function createRound({ players, mode, questions, used, randomOrder }) {
+  if (mode === 'reverse') return createReverseRound({ players, questions, used, randomOrder });
+  return createStandardRound({ players, mode, questions, used, randomOrder });
 }
