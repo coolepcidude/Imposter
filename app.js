@@ -471,7 +471,7 @@ const RoundSummaryCard = memo(function RoundSummaryCard({round,totalRounds,group
 /* ══════════════════════════════════════════════
    SETTINGS PAGE
 ══════════════════════════════════════════════ */
-const SettingsPage = memo(function SettingsPage({state,dispatch,activePacks,togglePack,modifiersEnabled,setModifiersEnabled,customCount,onBack,T,D,S}) {
+const SettingsPage = memo(function SettingsPage({state,dispatch,activePacks,togglePack,modifiersEnabled,setModifiersEnabled,randomOrder,setRandomOrder,customCount,onBack,T,D,S}) {
   return (
     <div style={{...S.card,animation:'fadeUp .28s ease both'}}>
       <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:28}}>
@@ -526,6 +526,17 @@ const SettingsPage = memo(function SettingsPage({state,dispatch,activePacks,togg
             <div className="toggle-thumb" style={{left:state.timerEnabled?21:3}}/>
           </button>
         </div>
+      </div>
+
+      <p style={S.lbl}>Player Order</p>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'13px 16px',borderRadius:T.r,marginBottom:18,background:randomOrder?'rgba(16,185,129,.08)':T.surface,border:`1px solid ${randomOrder?'rgba(16,185,129,.3)':T.border}`,transition:'all .2s'}}>
+        <div>
+          <span style={{fontWeight:800,fontSize:14,color:randomOrder?'#10B981':T.text}}>🔀 Random Order</span>
+          <span style={{display:'block',fontSize:11,color:T.textDim,marginTop:2}}>{randomOrder?'Phone passes in a random order each round':'Phone passes in the order players were added'}</span>
+        </div>
+        <button className="toggle-track" onClick={()=>{haptic(20);setRandomOrder(v=>!v);}} style={{background:randomOrder?'#10B981':T.isDark?'rgba(255,220,130,.12)':'rgba(100,60,10,.12)',flexShrink:0}}>
+          <div className="toggle-thumb" style={{left:randomOrder?21:3}}/>
+        </button>
       </div>
 
       <p style={S.lbl}>Modifiers</p>
@@ -707,6 +718,7 @@ function App() {
   const [qs,setQs]=useState([]); const [qLoading,setQLoading]=useState(true); const [qError,setQError]=useState(false);
   const [customQs,setCustomQs]=useState(()=>{try{return JSON.parse(localStorage.getItem('outlier_custom_qs')||'[]');}catch{return [];}});
   const [modOn,setModOn]=useState(false);
+  const [randomOrder,setRandomOrder]=useState(false);
   const [timeLeft,setTimeLeft]=useState(30); const [soundOn,setSoundOn]=useState(true);
   const timerRef=useRef(null); const subRef=useRef(false);
 
@@ -806,11 +818,11 @@ function App() {
     const lower=v.map(p=>p.name.trim().toLowerCase());
     if (lower.length!==new Set(lower).size){dispatch({type:'SET_NAME_ERROR',error:'⚠️ Two players have the same name.'});return;}
     haptic([40,20,80]); resetRNG();
-    const rd=createRound({players:v,mode:state.mode,questions:qs,used:[]});
+    const rd=createRound({players:v,mode:state.mode,questions:qs,used:[],randomOrder});
     const playerModifiers=modOn?assignPlayerMods(v):{};
     dispatch({type:'BEGIN_GAME',validPlayers:v,roundData:rd,playerModifiers});
     SoundEngine.click();
-  },[state.players,state.mode,qs,modOn,assignPlayerMods]);
+  },[state.players,state.mode,qs,modOn,randomOrder,assignPlayerMods]);
 
   const submitAns=useCallback(()=>{subRef.current=true;clearInterval(timerRef.current);haptic([40,30,40]);SoundEngine.submit();dispatch({type:'SUBMIT_ANSWER'});},[]);
   const castVote=useCallback(s=>{haptic(25);SoundEngine.vote();dispatch({type:'CAST_VOTE',suspect:s});},[]);
@@ -824,10 +836,10 @@ function App() {
   const nextRound=useCallback(()=>{
     haptic(30);SoundEngine.click();
     if (state.round>=state.totalRounds){dispatch({type:'GO_FINAL'});return;}
-    const rd=createRound({players:state.players,mode:state.mode,questions:qs,used:state.usedIdx});
+    const rd=createRound({players:state.players,mode:state.mode,questions:qs,used:state.usedIdx,randomOrder});
     const playerModifiers=modOn?assignPlayerMods(state.players):{};
     dispatch({type:'NEXT_ROUND',roundData:rd,newRound:state.round+1,playerModifiers});
-  },[state.round,state.totalRounds,state.players,state.mode,state.usedIdx,qs,modOn,assignPlayerMods]);
+  },[state.round,state.totalRounds,state.players,state.mode,state.usedIdx,qs,modOn,randomOrder,assignPlayerMods]);
   const toggleSound=useCallback(()=>{const n=SoundEngine.toggle();setSoundOn(n);haptic(20);},[]);
   const showQ=useCallback(()=>{haptic(30);SoundEngine.click();dispatch({type:'SET_PHASE',phase:'question'});},[]);
   const showVote=useCallback(()=>{haptic(30);SoundEngine.click();dispatch({type:'SET_PHASE',phase:'vote_cast'});},[]);
@@ -880,7 +892,7 @@ function App() {
           <button onClick={()=>{haptic(15);SoundEngine.click();setSetupPage('settings');}} style={{display:'flex',alignItems:'center',gap:12,width:'100%',padding:'12px 16px',borderRadius:T.r,border:`1px solid ${T.border}`,background:T.surface,textAlign:'left',fontFamily:'inherit',cursor:'pointer',marginBottom:10,transition:'all .18s'}}>
             <span style={{fontSize:20}}>{mInfo.emoji}</span>
             <div style={{flex:1}}>
-              <span style={{fontWeight:800,fontSize:13,color:mInfo.color,display:'block'}}>{mInfo.name} · {state.totalRounds} rounds{state.timerEnabled?` · ${state.timerSeconds}s timer`:''}{modOn?' · Modifiers on':''}{state.confidenceEnabled?' · Confidence on':''}</span>
+              <span style={{fontWeight:800,fontSize:13,color:mInfo.color,display:'block'}}>{mInfo.name} · {state.totalRounds} rounds{state.timerEnabled?` · ${state.timerSeconds}s timer`:''}{randomOrder?' · Random order':''}{modOn?' · Modifiers on':''}{state.confidenceEnabled?' · Confidence on':''}</span>
               <span style={{fontSize:11,color:T.textDim}}>{activePacks.length} pack{activePacks.length!==1?'s':''} selected · Tap to change settings</span>
             </div>
             <span style={{color:T.textDim,fontSize:16}}>⚙</span>
@@ -920,7 +932,7 @@ function App() {
       )}
 
       {/* SETTINGS */}
-      {!qLoading&&state.phase==='setup'&&setupPage==='settings'&&<SettingsPage state={state} dispatch={dispatch} activePacks={activePacks} togglePack={togglePack} modifiersEnabled={modOn} setModifiersEnabled={setModOn} customCount={customQs.length} onBack={()=>setSetupPage('players')} T={T} D={D} S={S}/>}
+      {!qLoading&&state.phase==='setup'&&setupPage==='settings'&&<SettingsPage state={state} dispatch={dispatch} activePacks={activePacks} togglePack={togglePack} modifiersEnabled={modOn} setModifiersEnabled={setModOn} randomOrder={randomOrder} setRandomOrder={setRandomOrder} customCount={customQs.length} onBack={()=>setSetupPage('players')} T={T} D={D} S={S}/>}
 
       {/* CUSTOM QUESTIONS */}
       {!qLoading&&state.phase==='setup'&&setupPage==='custom'&&<CustomQuestionsPage customQuestions={customQs} setCustomQuestions={setCustomQs} activePacks={activePacks} setActivePacks={setActivePacks} onBack={()=>setSetupPage('players')} T={T} D={D} S={S}/>}
