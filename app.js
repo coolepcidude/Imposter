@@ -65,15 +65,15 @@ const DARK = {
   shadow:'none',
 };
 const LIGHT = {
-  bg:'#FAF5ED', cardSolid:'#FFFCF5',
-  surface:'rgba(100,55,5,0.05)', surfaceHi:'rgba(100,55,5,0.08)',
-  border:'rgba(120,70,10,0.1)', borderHi:'rgba(120,70,10,0.2)',
+  bg:'#FAF5ED', cardSolid:'#FFFDF7',
+  surface:'rgba(255,255,255,0.72)', surfaceHi:'rgba(255,255,255,0.92)',
+  border:'rgba(120,70,10,0.11)', borderHi:'rgba(120,70,10,0.22)',
   text:'#2A1A08', textMid:'rgba(42,26,8,0.58)', textDim:'rgba(42,26,8,0.40)',
   r:16, rl:22, rx:28, isDark:false,
   titleGrad:'linear-gradient(135deg,#B45309 0%,#C2410C 45%,#B91C1C 100%)',
   btnGrad:'linear-gradient(135deg,#B45309 0%,#B91C1C 100%)',
   btnGradShadow:'rgba(180,83,9,0.4)',
-  shadow:'0 2px 24px rgba(100,55,5,0.1)',
+  shadow:'none',
 };
 
 function makeS(T) {
@@ -81,7 +81,7 @@ function makeS(T) {
     page:{ minHeight:'100vh', background:T.bg, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'28px 18px 40px', position:'relative', overflow:'hidden', transition:'background .3s' },
     card:{ width:'100%', maxWidth:468, background:'transparent', boxShadow:T.shadow },
     lbl:{ color:T.textDim, fontSize:10, letterSpacing:2.5, textTransform:'uppercase', display:'block', marginBottom:10, fontWeight:700 },
-    inp:{ width:'100%', background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.r, padding:'13px 16px', color:T.text, fontSize:15, outline:'none', fontFamily:'inherit', transition:'border-color .18s, box-shadow .18s' },
+    inp:{ width:'100%', background:T.isDark?T.surface:'rgba(255,255,255,0.9)', border:`1px solid ${T.border}`, borderRadius:T.r, padding:'13px 16px', color:T.text, fontSize:15, outline:'none', fontFamily:'inherit', transition:'border-color .18s, box-shadow .18s' },
   };
 }
 function makeD(T) {
