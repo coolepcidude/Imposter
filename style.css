@@ -1,238 +1,67 @@
 /* ════════════════════════════════════════════════════
    style.css  —  Outlier Party Game
-   Global resets, keyframes, and utility classes.
-   Most component styles are inline in app.js via
-   the T token system. This file handles what inline
-   styles can't: animations, pseudo-elements, toggles,
-   the timer bar, and base resets.
 ════════════════════════════════════════════════════ */
-
-/* ── Reset ─────────────────────────────────────── */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html {
-  font-size: 16px;
-  -webkit-text-size-adjust: 100%;
-}
-
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; -webkit-text-size-adjust: 100%; }
 body {
-  font-family: 'Plus Jakarta Sans', 'DM Sans', system-ui, -apple-system, sans-serif;
-  background: #070810;
-  color: #F0F4FF;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  background: #0F0B07; color: #F5E6C8; line-height: 1.5;
+  -webkit-font-smoothing: antialiased; overflow-x: hidden;
+  transition: background .3s, color .3s;
 }
+button { font-family: inherit; cursor: pointer; }
+input, textarea { font-family: inherit; }
 
-button {
-  font-family: inherit;
-  cursor: pointer;
-}
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(245,160,40,.2); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(245,160,40,.38); }
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: rgba(120,60,10,.18); }
 
-input, textarea {
-  font-family: inherit;
-}
+::placeholder { color: rgba(245,230,200,.22); }
+[data-theme="light"] ::placeholder { color: rgba(42,26,8,.28); }
 
-/* ── Scrollbar ──────────────────────────────────── */
-::-webkit-scrollbar {
-  width: 4px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 99px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.22);
-}
+button:hover { opacity: .88; }
+button:active { transform: scale(.97); }
+button:focus-visible { outline: 2px solid rgba(245,159,10,.7); outline-offset: 2px; }
 
-/* ── Placeholders ───────────────────────────────── */
-::placeholder {
-  color: rgba(240, 244, 255, 0.22);
-}
-
-/* ── Button interactions ────────────────────────── */
-button:hover {
-  opacity: 0.88;
-}
-button:active {
-  transform: scale(0.97);
-}
-button:focus-visible {
-  outline: 2px solid rgba(99, 102, 241, 0.7);
-  outline-offset: 2px;
-}
-
-/* ── Title gradient ─────────────────────────────── */
 .title-gradient {
-  background: linear-gradient(135deg, #818CF8 0%, #A78BFA 40%, #C084FC 70%, #E879F9 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-  display: inline-block;
+  background: linear-gradient(135deg, #FBBF24 0%, #F97316 45%, #EF4444 100%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent; display: inline-block;
+}
+[data-theme="light"] .title-gradient {
+  background: linear-gradient(135deg, #B45309 0%, #C2410C 45%, #B91C1C 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
 }
 
-/* ── Toggle switch ──────────────────────────────── */
 .toggle-track {
-  position: relative;
-  width: 44px;
-  height: 26px;
-  border-radius: 99px;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  flex-shrink: 0;
-  transition: background 0.2s ease;
+  position: relative; width: 44px; height: 26px; border-radius: 99px;
+  border: none; cursor: pointer; padding: 0; flex-shrink: 0; transition: background .2s;
 }
 .toggle-thumb {
-  position: absolute;
-  top: 3px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
-  transition: left 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-/* ── Timer bar ──────────────────────────────────── */
-.timer-bar-track {
-  width: 100%;
-  height: 5px;
-  border-radius: 99px;
-  background: rgba(255, 255, 255, 0.07);
-  overflow: hidden;
+  position: absolute; top: 3px; width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4);
+  transition: left .2s cubic-bezier(.34,1.56,.64,1);
 }
 .timer-bar-fill {
-  height: 100%;
-  border-radius: 99px;
-  transition: width 1s linear, background 0.5s ease, box-shadow 0.5s ease;
+  height: 100%; border-radius: 99px;
+  transition: width 1s linear, background .5s;
 }
 
-/* ── Modifier banner ────────────────────────────── */
-.modifier-banner {
-  animation: fadeUp 0.35s ease both;
-}
-
-
-/* ════════════════════════════════════════════════════
-   KEYFRAME ANIMATIONS
-════════════════════════════════════════════════════ */
-
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-@keyframes popIn {
-  0%   { opacity: 0; transform: scale(0.88); }
-  65%  { transform: scale(1.04); }
-  100% { opacity: 1; transform: scale(1); }
-}
-
-@keyframes slideR {
-  from { opacity: 0; transform: translateX(-24px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes slideL {
-  from { opacity: 0; transform: translateX(24px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes stagger {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes glow {
-  0%, 100% { box-shadow: 0 0 10px currentColor; }
-  50%       { box-shadow: 0 0 28px currentColor; }
-}
-
-@keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50%       { transform: translateY(-8px); }
-}
-
-@keyframes lockBounce {
-  0%, 100% { transform: scale(1) rotate(0deg); }
-  20%       { transform: scale(1.18) rotate(-6deg); }
-  40%       { transform: scale(1.12) rotate(5deg); }
-  60%       { transform: scale(1.06) rotate(-3deg); }
-  80%       { transform: scale(1.02) rotate(1deg); }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.55; }
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-
-@keyframes shimmer {
-  0%   { background-position: -200% center; }
-  100% { background-position:  200% center; }
-}
-
-@keyframes crown {
-  0%   { transform: translateY(-6px) rotate(-10deg); opacity: 0; }
-  60%  { transform: translateY(2px) rotate(4deg); }
-  100% { transform: translateY(0) rotate(0deg); opacity: 1; }
-}
-
-@keyframes revealName {
-  0%   { clip-path: inset(0 100% 0 0); opacity: 0; }
-  100% { clip-path: inset(0 0% 0 0);   opacity: 1; }
-}
-
-@keyframes timerPulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.35; }
-}
-
-/* Ambient background drifts (used for decorative blobs if any) */
-@keyframes drift1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33%       { transform: translate(30px, -20px) scale(1.05); }
-  66%       { transform: translate(-20px, 15px) scale(0.97); }
-}
-
-@keyframes drift2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33%       { transform: translate(-25px, 18px) scale(1.04); }
-  66%       { transform: translate(20px, -12px) scale(0.98); }
-}
-
-@keyframes drift3 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50%       { transform: translate(15px, 22px) scale(1.03); }
-}
-
-
-/* ════════════════════════════════════════════════════
-   REDUCED MOTION
-════════════════════════════════════════════════════ */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
+@keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+@keyframes popIn { 0%{opacity:0;transform:scale(.88)} 65%{transform:scale(1.04)} 100%{opacity:1;transform:scale(1)} }
+@keyframes slideR { from{opacity:0;transform:translateX(-24px)} to{opacity:1;transform:translateX(0)} }
+@keyframes stagger { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+@keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+@keyframes lockBounce { 0%,100%{transform:scale(1) rotate(0deg)} 20%{transform:scale(1.18) rotate(-6deg)} 40%{transform:scale(1.12) rotate(5deg)} 60%{transform:scale(1.06) rotate(-3deg)} 80%{transform:scale(1.02) rotate(1deg)} }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+@keyframes crown { 0%{transform:translateY(-6px) rotate(-10deg);opacity:0} 60%{transform:translateY(2px) rotate(4deg)} 100%{transform:translateY(0) rotate(0deg);opacity:1} }
+@keyframes revealName { 0%{clip-path:inset(0 100% 0 0);opacity:0} 100%{clip-path:inset(0 0% 0 0);opacity:1} }
+@keyframes timerPulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+@keyframes drift1 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(30px,-20px) scale(1.05)} 66%{transform:translate(-20px,15px) scale(.97)} }
+@keyframes drift2 { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(-25px,18px) scale(1.04)} 66%{transform:translate(20px,-12px) scale(.98)} }
+@keyframes drift3 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(15px,22px) scale(1.03)} }
+@media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important; } }
